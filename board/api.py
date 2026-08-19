@@ -7,7 +7,8 @@ This is the contract every piece you build codes against.
     GET  /board                      everything: gates, slots, flights, clock
     GET  /now                        the board clock  -> {"now": <minutes>}
     GET  /unassigned                 flights with no gate yet
-    GET  /log?n=50                   recent decisions, newest last
+    GET  /log?n=50                   recent decisions, newest last (memory, last 400)
+    GET  /decisions?flight=PK-304    the FULL history from the database, oldest first
 
   WRITE  (all return 200 {"ok":true} or 409 {"ok":false,"reason":...})
     POST /claim    {"flight","gate","actor"}    take a gate
@@ -27,6 +28,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from .state import BOARD, Rejected
 from .ui import PAGE
 from .config import PIECES
+from . import db
 
 from .config import BOARD_PORT as PORT
 
@@ -72,6 +74,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/log":
             n = int(q.get("n", 50))
             return self._send(200, {"log": BOARD.log[-n:]})
+        if path == "/decisions":
+            return self._send(200, {"decisions": db.history(q.get("flight"),
+                                                            int(q.get("n", 200)))})
         if path == "/pieces":
             return self._send(200, {"pieces": PIECES})
         if path == "/health":

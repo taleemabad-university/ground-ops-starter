@@ -109,19 +109,69 @@ nothing else changes. Same trick works for your own piece.
 
 | | | |
 |---|---|---|
-| `board/` | **given** | The shared state. Both hard rules enforced, in one place, under one lock. Plus `client.py` — the client and the "be reachable" helper, so you don't write HTTP boilerplate three times. |
+| `board/` | **given** | The shared state, both hard rules under one lock, and `db.py` — SQLite persistence plus the full decision history. Plus `client.py`, the client and "be reachable" helper. |
 | `feeds/` | **given** | Arrivals and departures, live, with duplicates in them. |
 | `harness/` | **given** | The failure injector and the verdict checks we run on day 2. Run them yourself as often as you like. |
 | `assigners/` | **yours** | Two or more, running at once. They compete. |
 | `replanner/` | **yours** | Redo the flights a delay actually touched — and damp it. |
 | `monitor/` | **yours** | Timer, safe fallback, logs, and the tests. |
 | `contracts.md` | **yours** | Written before any code. Day 1, first thing. |
-| `tests/` | **yours** | One per piece, plus one per failure you hit. |
+| `tests/` | **yours** | One per service, plus one per failure you hit. |
+| `CLAUDE.md` | **half each** | The given half is written. The `YOURS` half is empty on purpose — see below. |
 
 **What's in `assigners/`, `replanner/` and `monitor/` right now runs, and is
 wrong.** Each file opens with exactly what is wrong with it and which outcome it
 maps to. That is your starting point, not your answer — read the header of each
 before you touch it.
+
+### CLAUDE.md and skills — who writes what
+
+`CLAUDE.md` ships with the top half filled in: the board contract, the do-not-edit
+list, the conventions, the commands. That is the same deal as the board itself —
+it's setup, and setup is not what we're testing.
+
+**The `YOURS` half is empty and stays that way until you write it.** What your
+service does and doesn't do, the contract with the services either side, the
+decisions you don't want quietly undone, and — the one that counts — the things
+that are true but not obvious from reading the code.
+
+That last section is the whole point. Every line in it is something your build
+is relying on a human to remember. Right now that human is you, sitting next to
+it. On Monday it isn't, and an agent working in this repo has no way to know any
+of it. Writing those down *is* Part A SLO 3 — hidden dependencies — done for
+real rather than described.
+
+**Skills** are yours entirely. A skill is a procedure you would otherwise repeat
+by hand. Don't invent one on day 1; you'll know when you need it. The obvious
+candidate turns up on day 2, the second time you turn a failure into a
+regression test — write the steps down once instead of re-deriving them. That's
+SLO 7 as something you can hand to someone else.
+
+### Where the data lives
+
+The board stores everything in **SQLite** — `board.db`, standard library, nothing
+to install. It buys two things:
+
+**The board survives a restart.** Whoever hosts it can reboot without wiping the
+team's afternoon; `./run` restores every flight from disk. `./run fresh` if you
+want to start genuinely empty.
+
+**Every decision is kept.** The in-memory log holds the last 400 events; the
+`decisions` table holds all of them, indexed by flight and by actor. On day 2
+that is how you answer *"is this my fault or upstream?"* — SLO 2, fault
+isolation — without reading anybody's code:
+
+```bash
+# everything that ever happened to one flight, in order
+curl -s "localhost:8080/decisions?flight=PK-304" | python3 -m json.tool
+
+# who keeps losing races?
+sqlite3 board.db "SELECT actor, COUNT(*) FROM decisions
+                  WHERE event='claim_rejected' GROUP BY actor ORDER BY 2 DESC"
+```
+
+You never write to `board.db` yourself — you go through the board's API and it
+persists for you.
 
 ---
 

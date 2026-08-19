@@ -4,6 +4,7 @@
 #   ./run                    EVERYTHING on this machine  (trying things out, solo)
 #   ./run board              ONLY the board + feeds      (whoever hosts it for the team)
 #   ./run mine assigner-A    ONLY your piece, pointed at $BOARD_URL from team.env
+#   ./run fresh [mode]       same, but wipe board.db first (the board persists!)
 #
 # On a four-person team you almost always want the last one. There is ONE board.
 set -uo pipefail
@@ -14,6 +15,12 @@ cleanup(){ echo; echo "stopping…"; for p in "${pids[@]:-}"; do kill "$p" 2>/de
 trap cleanup EXIT INT TERM
 
 show(){ "$PY" -c 'import board.config as c; print(c.describe())'; }
+
+# `./run fresh ...` wipes board.db first
+if [ "${1:-}" = "fresh" ]; then
+  shift
+  rm -f board.db && echo "board.db wiped — starting empty"
+fi
 
 case "${1:-all}" in
   mine)
@@ -61,6 +68,6 @@ BANNER
     wait
     ;;
 
-  -h|--help)  sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help)  sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) echo "unknown mode: $1 — try: (nothing) | board | mine <piece> | --help"; exit 2 ;;
 esac

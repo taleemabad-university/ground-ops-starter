@@ -13,6 +13,8 @@ import threading
 import time
 from dataclasses import dataclass, field, asdict
 
+from . import db
+
 GATES = ["G1", "G2", "G3", "G4", "G5", "G6"]
 SLOTS = ["R1", "R2", "R3", "R4"]
 
@@ -68,8 +70,31 @@ class Board:
         with self._lock:
             entry = {"t": self.now_min(), "actor": actor, "event": event, **kw}
             self.log.append(entry)
-            del self.log[:-400]
+            del self.log[:-400]        # memory keeps the last 400 …
+            db.record(entry)           # … the database keeps all of them
             return entry
+
+    def _persist(self, flight_id):
+        f = self.flights.get(flight_id)
+        if f is not None:
+            db.save_flight(f)
+
+    def restore(self):
+        """Rebuild from disk. The board survives whoever is hosting it rebooting."""
+        with self._lock:
+            for row in db.all_flights():
+                f = Flight(id=row["id"], kind=row["kind"], eta_min=row["eta_min"],
+                           gate=row["gate"], slot=row["slot"], status=row["status"],
+                           delay_min=row["delay_min"], decided_by=row["decided_by"],
+                           reason=row["reason"])
+                self.flights[f.id] = f
+                if f.gate:
+                    self.gates[f.gate] = f.id
+                if f.slot:
+                    self.slots[f.slot] = f.id
+            self.closed_slots = set(db.get_meta("closed_slots", []))
+            self.skew_min = db.get_meta("skew_min", 0)
+            return len(self.flights)
 
     # ── flights ──────────────────────────────────────────────────────────
     def upsert(self, flight_id, kind, eta_min):
@@ -79,6 +104,7 @@ class Board:
             if f:
                 return False                       # already known — a duplicate
             self.flights[flight_id] = Flight(id=flight_id, kind=kind, eta_min=eta_min)
+            self._persist(flight_id)
             return True
 
     def unassigned(self):
@@ -107,6 +133,7 @@ class Board:
             f.decided_by = actor
             self.writes += 1
             self.note(actor, "claim_ok", flight=flight_id, gate=gate)
+            self._persist(flight_id)
             return True
 
     def claim_slot(self, flight_id, slot, actor="?"):
@@ -131,6 +158,7 @@ class Board:
             f.decided_by = actor
             self.writes += 1
             self.note(actor, "slot_ok", flight=flight_id, slot=slot)
+            self._persist(flight_id)
             return True
 
     def release_gate(self, gate, actor="?"):
@@ -143,6 +171,7 @@ class Board:
             self.gates[gate] = None
             self.writes += 1
             self.note(actor, "release_gate", gate=gate, flight=fid)
+            if fid: self._persist(fid)
             return fid
 
     def flag(self, flight_id, decision, reason, actor="monitor"):
@@ -158,6 +187,7 @@ class Board:
             f.decided_by = actor
             self.writes += 1
             self.note(actor, "fallback", flight=flight_id, decision=decision, reason=reason)
+            self._persist(flight_id)
             return True
 
     # ── harness surface · day 2 only ─────────────────────────────────────
@@ -175,6 +205,7 @@ class Board:
                 f.status = GATED if f.gate else PENDING
             self.note("HARNESS", "delay", flight=flight_id, minutes=minutes,
                       gate=f.gate, missed_slot=missed)
+            self._persist(flight_id)
             return {"gate": f.gate, "missed_slot": missed}
 
     def close_runway(self, slots):
@@ -188,12 +219,16 @@ class Board:
                     self.flights[fid].status = GATED if self.flights[fid].gate else PENDING
                     evicted.append(fid)
                 self.slots[s] = None
+            db.set_meta("closed_slots", sorted(self.closed_slots))
+            for fid in evicted:
+                self._persist(fid)
             self.note("HARNESS", "close_runway", slots=list(slots), evicted=evicted)
             return evicted
 
     def set_skew(self, minutes):
         with self._lock:
             self.skew_min = minutes
+            db.set_meta("skew_min", minutes)
             self.note("HARNESS", "clock_skew", minutes=minutes)
 
     def snapshot(self):
