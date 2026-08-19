@@ -26,9 +26,9 @@ WHAT IS WRONG WITH IT
 YOUR JOB
     -> work out WHICH flights a delay actually touches, and move only those
     -> rate-limit yourself: at most one re-plan per flight per N board-minutes,
-       and back off when the board keeps changing under you             (SLO 6)
+       and back off when the board keeps changing under you   self-healing (SLO 6)
     -> read time from board.now(), never from your own clock
-    -> say out loud in the log what you changed and why                 (SLO 6)
+    -> say out loud in the log what you changed and why    observability (SLO 6)
 """
 import sys
 import time

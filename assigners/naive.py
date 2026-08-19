@@ -25,11 +25,11 @@ WHAT IS WRONG WITH IT
        between failing loudly and dying quietly.
 
 YOUR JOB
-    -> read what claim() returns and act on it                       (SLO 6)
+    -> read what claim() returns and act on it     graceful degradation (SLO 6)
     -> when you are refused, put the flight BACK in play, do not drop it
     -> keep your /state honest: it must match the board, always
     -> agree with the other assigner who takes what, and write it in
-       contracts.md before you touch this file                       (SLO 1)
+       contracts.md before you touch this file        interface contract (SLO 1)
 """
 import sys
 import time

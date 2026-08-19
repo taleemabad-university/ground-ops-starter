@@ -222,10 +222,12 @@ graduation.
 
 The four that matter most:
 
-- **8** — name the real user and decide what your piece does and doesn't do, before writing code
-- **1** — agree what your piece takes in and hands out, and don't change it without telling anyone
-- **4** — get it running somewhere a teammate can reach
-- **6** — fail loudly and keep going instead of dying quietly
+| | Skill | What it means here |
+|---|---|---|
+| **8** | scoping | name the real user, decide what's in and out, before writing code |
+| **1** | interface contract | agree your service's inputs and outputs, never change them silently |
+| **4** | deployment | running on an endpoint a teammate can reach — not localhost |
+| **6** | graceful degradation | fail loudly and keep running instead of dying silently |
 
 ---
 

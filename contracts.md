@@ -56,8 +56,9 @@ about the world. Write down here what you actually do about it.
 
 ## What we are NOT building
 
-> Scope, decided out loud, before you are tired. Two days, one component. SLO 9
-> says stick to this when time runs short — so make it something you can stick to.
+> Scope, decided out loud, before you are tired. Two days, one service. SLO 9 is
+> MVP and roadmap — hold this line when time runs short, so make it a line you
+> can actually hold.
 
 -
 -
@@ -65,13 +66,13 @@ about the world. Write down here what you actually do about it.
 
 ---
 
-## In the first version / left for later
+## MVP / roadmap
 
-**First version (must work by end of day 1):**
+**v1 — must work by end of day 1:**
 
 -
 
-**Left for later:**
+**Roadmap — everything after that:**
 
 -
 

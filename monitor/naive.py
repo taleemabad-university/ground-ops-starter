@@ -25,9 +25,9 @@ WHAT IS WRONG WITH IT
 YOUR JOB
     -> start a clock on every flight the moment it has nowhere to go
     -> when it runs out, PICK SOMETHING: hold on the tarmac, or flag a divert.
-       A safe backup beats hanging every single time                    (SLO 6)
-    -> write down every decision and the reason for it                  (SLO 6)
-    -> turn each day-2 failure you hit into a test in tests/            (SLO 7)
+       A safe backup beats hanging every time      graceful degradation (SLO 6)
+    -> write down every decision and the reason for it     observability (SLO 6)
+    -> turn each day-2 failure into a test in tests/    regression tests (SLO 7)
 """
 import sys
 import time
