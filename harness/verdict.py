@@ -11,15 +11,7 @@ import json
 import time
 import urllib.request
 
-BOARD_URL = "http://127.0.0.1:8080"
-
-# your pieces. change the ports here if your team used different ones.
-PIECES = {
-    "assigner-A": 8101,
-    "assigner-B": 8102,
-    "replanner":  8103,
-    "monitor":    8104,
-}
+from board.config import BOARD_URL, PIECES     # both come from team.env
 
 RESOLVED = ("gated", "slotted", "held", "divert")
 RUNAWAY_WRITES_PER_SEC = 25          # above this and the board is being hammered
@@ -37,7 +29,7 @@ def board():
 def piece(name):
     """-> dict | None (None means it did not answer, which is itself a result)."""
     try:
-        return _get(f"http://127.0.0.1:{PIECES[name]}/state", timeout=2)
+        return _get(f"{PIECES[name]}/state", timeout=2)
     except Exception:
         return None
 

@@ -30,7 +30,7 @@ import urllib.request
 
 from . import verdict
 
-BOARD = "http://127.0.0.1:8080"
+from board.config import BOARD_URL as BOARD
 
 
 def post(path, payload):

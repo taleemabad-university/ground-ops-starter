@@ -17,7 +17,7 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-BOARD_URL = "http://127.0.0.1:8080"
+from .config import BOARD_URL          # set in team.env — NOT hardcoded to your laptop
 
 
 class Board:

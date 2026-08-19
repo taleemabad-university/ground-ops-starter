@@ -60,6 +60,48 @@ python -m unittest discover -v
 
 ---
 
+## Four people, four roles, ONE board
+
+This is the bit that catches teams out. **There is one board for the whole team,
+running in one place.** Your four pieces run in four different places and all
+point at it. Four laptops each running `./run` is not one system — it is four
+separate systems that never meet, and every failure we inject on day 2 will
+politely do nothing.
+
+Everyone clones the same repo. Then each person owns exactly one role:
+
+| Role | Runs | Owns |
+|---|---|---|
+| **assigner A** | `./run mine assigner-A` | `assigners/` — competes with B for gates |
+| **assigner B** | `./run mine assigner-B` | `assigners/` — the same code, second instance |
+| **re-planner** | `./run mine replanner` | `replanner/` — blast radius + damping |
+| **monitor** | `./run mine monitor` | `monitor/` — timer, fallback, logs, tests |
+
+### Day 1, in order
+
+1. **Together, before any code** — fill in `contracts.md`, and decide who hosts
+   the board.
+2. **The host runs `./run board`.** It prints the address to give everyone.
+3. **Everyone copies `team.env.example` to `team.env`** and puts that address in
+   `BOARD_URL`, plus their own reachable address in their `*_URL` line. Commit
+   it — `team.env` is the machine-readable half of your contract.
+4. **Each person runs `./run mine <their-role>`** and builds their piece.
+5. Open the board's address in a browser. All four pieces should show
+   **answering**. If one says *no answer*, that piece is not reachable yet — and
+   that is SLO 4, not a detail.
+
+Your address is not `localhost` — that only means "this machine". On mac,
+`ipconfig getifaddr en0` gives you the one a teammate can actually reach.
+
+### Getting off your laptop
+
+A laptop that sleeps takes the whole team's board with it, so the board wants a
+real home. `Procfile` and `railway.toml` are in the repo and the board respects
+`$PORT`, so it deploys as-is. Point `BOARD_URL` at the deployed address and
+nothing else changes. Same trick works for your own piece.
+
+---
+
 ## What you get, and what you build
 
 | | | |

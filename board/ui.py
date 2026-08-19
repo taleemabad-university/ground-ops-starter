@@ -116,7 +116,7 @@ tr.late td{color:var(--bad)} tr.held td{color:var(--warn)} tr.placed td .st{colo
 
 </div>
 <script>
-const PIECES = {"assigner-A":8101,"assigner-B":8102,"replanner":8103,"monitor":8104};
+let PIECES = {};                 // filled from /pieces — the team's real addresses
 let lastWrites = null, lastT = null;
 
 const el = id => document.getElementById(id);
@@ -185,16 +185,20 @@ async function tick(){
   } catch {}
 }
 
+function short(u){ return String(u).replace(/^https?:\/\//, ""); }
+
 async function pieces(){
-  const cells = await Promise.all(Object.entries(PIECES).map(async ([name, port]) => {
+  if (!Object.keys(PIECES).length) {
+    try { PIECES = (await (await fetch("/pieces")).json()).pieces; } catch { return; }
+  }
+  const cells = await Promise.all(Object.entries(PIECES).map(async ([name, url]) => {
     try {
-      const r = await fetch(`http://${location.hostname}:${port}/health`, {signal: AbortSignal.timeout(1500)});
-      const j = await r.json();
+      const j = await (await fetch(`${url}/health`, {signal: AbortSignal.timeout(1800)})).json();
       return `<div class="cell up"><div class="id">${name}</div>
-        <div class="who">:${port} · answering</div><div class="meta">${esc(j.piece)}</div></div>`;
+        <div class="who">answering</div><div class="meta">${esc(short(url))}</div></div>`;
     } catch {
       return `<div class="cell down"><div class="id">${name}</div>
-        <div class="who">:${port} · no answer</div><div class="meta">not reachable</div></div>`;
+        <div class="who">no answer</div><div class="meta">${esc(short(url))}</div></div>`;
     }
   }));
   el("pieces").innerHTML = cells.join("");

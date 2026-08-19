@@ -1,40 +1,66 @@
 #!/usr/bin/env bash
-# Starts the whole system: board + feeds, then the four pieces.
-#   ./run            everything
-#   ./run board      just the board and the feeds
+# How you start things.
+#
+#   ./run                    EVERYTHING on this machine  (trying things out, solo)
+#   ./run board              ONLY the board + feeds      (whoever hosts it for the team)
+#   ./run mine assigner-A    ONLY your piece, pointed at $BOARD_URL from team.env
+#
+# On a four-person team you almost always want the last one. There is ONE board.
 set -uo pipefail
 cd "$(dirname "$0")"
 PY="${PYTHON:-python3}"
 pids=()
-cleanup() { echo; echo "stopping…"; for p in "${pids[@]:-}"; do kill "$p" 2>/dev/null; done; }
+cleanup(){ echo; echo "stopping…"; for p in "${pids[@]:-}"; do kill "$p" 2>/dev/null; done; }
 trap cleanup EXIT INT TERM
 
-"$PY" -m board.serve & pids+=($!)
-sleep 1.2
+show(){ "$PY" -c 'import board.config as c; print(c.describe())'; }
 
-if [ "${1:-all}" = "board" ]; then
-  echo "board only. start your pieces yourself, e.g.:"
-  echo "  python -m assigners.naive A 8101"
-  wait; exit 0
-fi
+case "${1:-all}" in
+  mine)
+    piece="${2:-}"
+    case "$piece" in
+      assigner-A) mod=(assigners.naive A 8101) ;;
+      assigner-B) mod=(assigners.naive B 8102) ;;
+      replanner)  mod=(replanner.naive 8103)   ;;
+      monitor)    mod=(monitor.naive 8104)     ;;
+      *) echo "which piece? assigner-A | assigner-B | replanner | monitor"; exit 2 ;;
+    esac
+    echo "running $piece against the team board:"; show; echo
+    exec "$PY" -m "${mod[@]}"
+    ;;
 
-"$PY" -m assigners.naive A 8101 & pids+=($!)
-"$PY" -m assigners.naive B 8102 & pids+=($!)
-"$PY" -m replanner.naive  8103  & pids+=($!)
-"$PY" -m monitor.naive    8104  & pids+=($!)
+  board)
+    echo "hosting the board for the team. everyone points BOARD_URL here."
+    "$PY" -m board.serve & pids+=($!)
+    sleep 1
+    echo "  tell your team:  BOARD_URL=http://$(ipconfig getifaddr en0 2>/dev/null || hostname):8080"
+    wait
+    ;;
 
-cat <<'BANNER'
+  all)
+    "$PY" -m board.serve & pids+=($!)
+    sleep 1.2
+    "$PY" -m assigners.naive A 8101 & pids+=($!)
+    "$PY" -m assigners.naive B 8102 & pids+=($!)
+    "$PY" -m replanner.naive  8103  & pids+=($!)
+    "$PY" -m monitor.naive    8104  & pids+=($!)
+    cat <<'BANNER'
 
-  everything is up.
-    board       :8080   /board /now /unassigned /log
-    assigner A  :8101   /health /state /log
-    assigner B  :8102
-    replanner   :8103
-    monitor     :8104
+  everything is up ON THIS MACHINE. fine for trying things out — but a team of
+  four needs ONE board with four pieces pointing at it. see `./run --help`.
 
-  watch it:   curl -s localhost:8080/board | python3 -m json.tool
-  break it:   ./inject late        (or close-runway | race | bad-clock | no-gate | all)
+BANNER
+    show
+    cat <<'BANNER'
+
+  watch it:   http://localhost:8080/
+  break it:   ./inject late   (or close-runway | race | bad-clock | no-gate | all)
   ctrl-c to stop.
 
 BANNER
-wait
+    wait
+    ;;
+
+  -h|--help)  sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) echo "unknown mode: $1 — try: (nothing) | board | mine <piece> | --help"; exit 2 ;;
+esac

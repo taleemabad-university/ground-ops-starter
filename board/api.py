@@ -26,8 +26,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .state import BOARD, Rejected
 from .ui import PAGE
+from .config import PIECES
 
-PORT = 8080
+from .config import BOARD_PORT as PORT
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -71,6 +72,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/log":
             n = int(q.get("n", 50))
             return self._send(200, {"log": BOARD.log[-n:]})
+        if path == "/pieces":
+            return self._send(200, {"pieces": PIECES})
         if path == "/health":
             return self._send(200, {"ok": True, "piece": "board"})
         return self._send(404, {"ok": False, "reason": "no_such_route"})
