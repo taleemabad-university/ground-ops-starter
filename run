@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Starts the whole system: board + feeds, then the four pieces.
+#   ./run            everything
+#   ./run board      just the board and the feeds
+set -uo pipefail
+cd "$(dirname "$0")"
+PY="${PYTHON:-python3}"
+pids=()
+cleanup() { echo; echo "stopping…"; for p in "${pids[@]:-}"; do kill "$p" 2>/dev/null; done; }
+trap cleanup EXIT INT TERM
+
+"$PY" -m board.serve & pids+=($!)
+sleep 1.2
+
+if [ "${1:-all}" = "board" ]; then
+  echo "board only. start your pieces yourself, e.g.:"
+  echo "  python -m assigners.naive A 8101"
+  wait; exit 0
+fi
+
+"$PY" -m assigners.naive A 8101 & pids+=($!)
+"$PY" -m assigners.naive B 8102 & pids+=($!)
+"$PY" -m replanner.naive  8103  & pids+=($!)
+"$PY" -m monitor.naive    8104  & pids+=($!)
+
+cat <<'BANNER'
+
+  everything is up.
+    board       :8080   /board /now /unassigned /log
+    assigner A  :8101   /health /state /log
+    assigner B  :8102
+    replanner   :8103
+    monitor     :8104
+
+  watch it:   curl -s localhost:8080/board | python3 -m json.tool
+  break it:   ./inject late        (or close-runway | race | bad-clock | no-gate | all)
+  ctrl-c to stop.
+
+BANNER
+wait
