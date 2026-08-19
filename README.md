@@ -60,13 +60,16 @@ python -m unittest discover -v
 
 ---
 
-## Four people, four roles, ONE board
+## Four people, four laptops, one board
 
-This is the bit that catches teams out. **There is one board for the whole team,
-running in one place.** Your four pieces run in four different places and all
-point at it. Four laptops each running `./run` is not one system — it is four
-separate systems that never meet, and every failure we inject on day 2 will
-politely do nothing.
+You each work on your own machine — that part is normal. What is shared is the
+**board**: there is exactly one for the whole team, hosted in one place, and all
+four of your pieces point at it.
+
+The trap is `./run`, because it starts a board of its own. If all four of you
+run it you get four separate airports that never meet, and every failure we
+inject on day 2 politely does nothing. **One** person runs `./run board`;
+everyone else runs `./run mine <role>`.
 
 Everyone clones the same repo. Then each person owns exactly one role:
 
