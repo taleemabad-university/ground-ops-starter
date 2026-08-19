@@ -11,6 +11,7 @@ from feeds.stream import start
 def main():
     start()
     print(f"board listening on :{PORT}   feeds streaming", flush=True)
+    print(f"  ->  http://localhost:{PORT}/   the live board, in a browser", flush=True)
     print("  GET  /board  /now  /unassigned  /log", flush=True)
     print("  POST /claim  /slot /release     /flag", flush=True)
     serve()

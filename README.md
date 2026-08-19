@@ -34,7 +34,12 @@ replanner   :8103
 monitor     :8104
 ```
 
-Watch it move:
+**Watch it move — open <http://localhost:8080/>.** The live board draws itself:
+gates, runway slots, every flight, whether each of your pieces is answering, and
+the board log as it happens. On day 2 you can watch a failure land in real time
+instead of reading it out of a log afterwards.
+
+Or read it raw:
 
 ```bash
 curl -s localhost:8080/board | python3 -m json.tool

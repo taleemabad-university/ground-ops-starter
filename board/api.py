@@ -3,6 +3,7 @@
 This is the contract every piece you build codes against.
 
   READ
+    GET  /                           the live board, as a web page — open it
     GET  /board                      everything: gates, slots, flights, clock
     GET  /now                        the board clock  -> {"now": <minutes>}
     GET  /unassigned                 flights with no gate yet
@@ -24,6 +25,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from .state import BOARD, Rejected
+from .ui import PAGE
 
 PORT = 8080
 
@@ -43,6 +45,14 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _html(self, page):
+        body = page.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def _body(self):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}")
@@ -50,6 +60,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path, _, qs = self.path.partition("?")
         q = dict(p.split("=", 1) for p in qs.split("&") if "=" in p)
+        if path in ("/", "/ui"):
+            return self._html(PAGE)
         if path == "/board":
             return self._send(200, BOARD.snapshot())
         if path == "/now":
