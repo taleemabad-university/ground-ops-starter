@@ -17,14 +17,36 @@ board.
 
 ## Get it running
 
+Python 3.10+. **No dependencies — stdlib only.** Nothing to install, nothing to
+go wrong on the day.
+
+**mac / linux**
+
 ```bash
 git clone <this repo>
 cd ground-ops-starter
 ./run
 ```
 
-Python 3.10+. **No dependencies — stdlib only.** Nothing to install, nothing to
-go wrong on the day.
+**windows** — `./run` is a mac/linux script and PowerShell will not run it. Use
+the Windows one, or just call Python directly:
+
+```powershell
+git clone <this repo>
+cd ground-ops-starter
+.\run.cmd
+```
+
+```powershell
+python run.py        # works everywhere, in any shell. use this if anything else misbehaves
+```
+
+Everywhere in this README, `./run x` on Windows means `.\run.cmd x` (or
+`python run.py x`), and `./inject x` means `.\inject.cmd x` (or
+`python -m harness.inject x`).
+
+If `python` is not found on Windows, install it from python.org and tick **"Add
+Python to PATH"** in the installer.
 
 ```
 board       :8080   /board /now /unassigned /log

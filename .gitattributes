@@ -1,0 +1,5 @@
+# Windows checkouts must not turn the bash scripts into CRLF (bash chokes on \r).
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf

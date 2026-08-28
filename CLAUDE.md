@@ -110,6 +110,11 @@ API, and the board persists. Never open the database file for writing.
 python -m unittest discover -v
 ```
 
+On Windows those are `.\run.cmd` and `.\inject.cmd` — same arguments. `python
+run.py` and `python -m harness.inject` work in any shell on any OS, and are the
+fallback if a wrapper misbehaves. Never assume a POSIX shell in code you write
+here: four people on four different laptops have to run the same repo.
+
 Watch it: <http://localhost:8080/> — the live board, updating as it moves.
 
 ---
