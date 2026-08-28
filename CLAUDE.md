@@ -32,6 +32,12 @@ makes the result meaningless.
 
 If a change seems to require editing the board, the change is wrong.
 
+**The board keeper is a person, not a piece of code.** The board is given and
+nobody edits it — including them. What they own is *running* it: the deploy,
+`team.env`, `contracts.md`, and the answer to "is the board healthy". They
+diagnose from `/log`, `/decisions` and `./inject verdict` — the evidence the board
+already keeps — never by reading a teammate's source.
+
 ---
 
 ## The board contract
@@ -103,17 +109,19 @@ API, and the board persists. Never open the database file for writing.
 
 ```bash
 ./run                     everything on this machine (solo, for trying things out)
-./run board               host the board for the team
+./run board               host the board for the team   (the board keeper)
+./run me                  print YOUR address, the one a teammate can reach
 ./run mine assigner-A     just your service, against the team's board
 ./inject late             break it (also: close-runway race bad-clock no-gate all)
-./inject verdict          score the board as it stands right now
+./inject verdict          score the board as it stands right now (the board keeper
+                          runs this constantly and routes what it finds)
 python -m unittest discover -v
 ```
 
 On Windows those are `.\run.cmd` and `.\inject.cmd` — same arguments. `python
 run.py` and `python -m harness.inject` work in any shell on any OS, and are the
 fallback if a wrapper misbehaves. Never assume a POSIX shell in code you write
-here: four people on four different laptops have to run the same repo.
+here: five people on five different laptops have to run the same repo.
 
 Watch it: <http://localhost:8080/> — the live board, updating as it moves.
 
@@ -127,7 +135,7 @@ does every answer you get.*
 
 ## Our service
 
-- **Role:** <assigner A | assigner B | re-planner | monitor>
+- **Role:** <board keeper | assigner A | assigner B | re-planner | monitor>
 - **Runs at:** <the address a teammate can actually reach>
 - **What it does:**
 - **What it deliberately does NOT do:**

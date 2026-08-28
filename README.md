@@ -13,6 +13,10 @@ One late flight holds its gate. So the next arrival can't park. So it misses its
 runway slot. So the flight after that gets bumped. One delay can move the whole
 board.
 
+**Three days.** Day 1 you understand it, day 2 you build it, day 3 we break it.
+**Start at [DAY-1.md](DAY-1.md)** — and don't write a service before you've been
+through it.
+
 ---
 
 ## Get it running
@@ -58,7 +62,7 @@ monitor     :8104
 
 **Watch it move — open <http://localhost:8080/>.** The live board draws itself:
 gates, runway slots, every flight, whether each of your pieces is answering, and
-the board log as it happens. On day 2 you can watch a failure land in real time
+the board log as it happens. On day 3 you can watch a failure land in real time
 instead of reading it out of a log afterwards.
 
 Or read it raw:
@@ -82,48 +86,97 @@ python -m unittest discover -v
 
 ---
 
-## Four people, four laptops, one board
+## Five roles, one board
 
 You each work on your own machine — that part is normal. What is shared is the
 **board**: there is exactly one for the whole team, hosted in one place, and all
-four of your pieces point at it.
+four of the pieces you build point at it.
 
-The trap is `./run`, because it starts a board of its own. If all four of you
-run it you get four separate airports that never meet, and every failure we
-inject on day 2 politely does nothing. **One** person runs `./run board`;
-everyone else runs `./run mine <role>`.
+The trap is `./run`, because it starts a board of its own. If everyone runs it you
+get five separate airports that never meet, and every failure we inject on day 3
+politely does nothing. The **board keeper** hosts the one board; everyone else runs
+`./run mine <role>`.
 
 Everyone clones the same repo. Then each person owns exactly one role:
 
 | Role | Runs | Owns |
 |---|---|---|
+| **board keeper** | `./run board` | The deploy, `team.env`, `contracts.md`, and the answer to "is the board healthy". **Team lead.** |
 | **assigner A** | `./run mine assigner-A` | `assigners/` — competes with B for gates |
 | **assigner B** | `./run mine assigner-B` | `assigners/` — the same code, second instance |
 | **re-planner** | `./run mine replanner` | `replanner/` — blast radius + damping |
 | **monitor** | `./run mine monitor` | `monitor/` — timer, fallback, logs, tests |
 
-### Day 1, in order
+*Four people instead of five? The board keeper doubles as the monitor — both are
+observability roles.*
 
-1. **Together, before any code** — fill in `contracts.md`, and decide who hosts
-   the board.
-2. **The host runs `./run board`.** It prints the address to give everyone.
-3. **Everyone copies `team.env.example` to `team.env`** and puts that address in
-   `BOARD_URL`, plus their own reachable address in their `*_URL` line. Commit
-   it — `team.env` is the machine-readable half of your contract.
-4. **Each person runs `./run mine <their-role>`** and builds their piece.
-5. Open the board's address in a browser. All four pieces should show
-   **answering**. If one says *no answer*, that piece is not reachable yet — and
-   that is SLO 4, not a detail.
+### The board keeper
 
-Your address is not `localhost` — that only means "this machine". Run `./run me`
-(Windows: `.\run.cmd me`) and it prints the one a teammate can actually reach.
+The board is **given code that nobody edits**, including the board keeper. What the
+board keeper owns is *running* it, and leading the team while it runs:
+
+- **Deploys the board** off a laptop, so it doesn't sleep and take the team's day
+  with it. `Procfile` and `railway.toml` ship in the repo and the board respects
+  `$PORT`. This is SLO 4 done more concretely than anyone else on the team does it.
+- **Owns `team.env`** and every address in it.
+- **Owns `contracts.md`** and its change log — SLO 11.
+- **Answers "is the board healthy", for every piece.** Not by reading a teammate's
+  source — by reading the evidence the board already keeps:
+
+  ```bash
+  ./inject verdict                              # the five checks, right now
+  curl -s localhost:8080/log                    # what the board saw
+  curl -s "localhost:8080/decisions?flight=PK-304"   # one flight's whole life
+  ```
+
+  "The board isn't settling" goes to the re-planner. "Assigner B's state has split
+  from the board" goes to assigner B. "AI-201 hung and nobody decided" goes to the
+  monitor. Same evidence everybody else can see, so it is a diagnosis and not an
+  opinion.
+- **Chairs** the day-1 contract session and the day-3 demo.
 
 ### Getting off your laptop
 
 A laptop that sleeps takes the whole team's board with it, so the board wants a
-real home. `Procfile` and `railway.toml` are in the repo and the board respects
-`$PORT`, so it deploys as-is. Point `BOARD_URL` at the deployed address and
-nothing else changes. Same trick works for your own piece.
+real home. **This is the board keeper's job, on day 1.** `Procfile` and
+`railway.toml` are in the repo and the board respects `$PORT`, so it deploys
+as-is. Point `BOARD_URL` at the deployed address and nothing else changes. Same
+trick works for your own piece.
+
+---
+
+## What `contracts.md` is, and who fills it in
+
+> A contract is the promise your service makes to the one next to it: exactly what
+> you take in, exactly what you hand back, and what you do when the board says no.
+> Written down before any code — so that when two pieces disagree at 4pm, you can
+> tell whose fault it is in a minute instead of an hour.
+
+That is SLO 1, and it is the first thing we check. `contracts.md` is filled in on
+**day 1, before any code**. Nobody fills it in alone, and no row is left to "the
+team" — every row has a name against it:
+
+| Section of `contracts.md` | Who writes it | What specifically |
+|---|---|---|
+| Who this is for | Everyone, board keeper chairs | One sentence. One person, one job, one shift — not "airports". |
+| Who owns what | Board keeper | Names, ports, health-check URLs, the deployed board address |
+| `assigner → board` | Assigner A + B **together** | `POST /claim {flight,gate,actor}` — and what they do on a 409 |
+| `re-planner → board` | Re-planner | Which writes it makes, its **blast-radius rule** and its **damping rule** |
+| `monitor → board` | Monitor | `POST /flag {flight,decision,reason}` — the allowed decision values, and its **timeout in board-minutes** |
+| `board → everyone` | Board keeper | The 200 / 409 shapes every writer has to handle |
+| What we are NOT building | Everyone | Three lines, decided out loud before you are tired |
+| MVP / roadmap | Everyone; board keeper holds the line | The v1 that must work by end of day 2 |
+| Changes to this file | Board keeper owns it | Every contract change once building has started — SLO 11 |
+
+`contracts.md` ships with the first row of the contracts table **filled in as a
+worked example**. That level of detail — the exact shape, and a real answer in the
+refusal column — is the standard for every other row.
+
+Two things people treat as implementation detail that are actually contracts, and
+both need a number in them: **the re-planner's damping rule** (it decides how hard
+the board gets written to, and the board settling is one of the five things we
+score) and **the monitor's timeout in board-minutes** (the board's clock runs one
+minute per six real seconds, so a timeout in wall-clock seconds never fires).
 
 ---
 
@@ -133,11 +186,11 @@ nothing else changes. Same trick works for your own piece.
 |---|---|---|
 | `board/` | **given** | The shared state, both hard rules under one lock, and `db.py` — SQLite persistence plus the full decision history. Plus `client.py`, the client and "be reachable" helper. |
 | `feeds/` | **given** | Arrivals and departures, live, with duplicates in them. |
-| `harness/` | **given** | The failure injector and the verdict checks we run on day 2. Run them yourself as often as you like. |
+| `harness/` | **given** | The failure injector and the verdict checks we run on day 3. Run them yourself as often as you like. |
 | `assigners/` | **yours** | Two or more, running at once. They compete. |
 | `replanner/` | **yours** | Redo the flights a delay actually touched — and damp it. |
 | `monitor/` | **yours** | Timer, safe fallback, logs, and the tests. |
-| `contracts.md` | **yours** | Written before any code. Day 1, first thing. |
+| `contracts.md` | **yours** | Written before any code. Day 1, and every row has an owner. |
 | `tests/` | **yours** | One per service, plus one per failure you hit. |
 | `CLAUDE.md` | **half each** | The given half is written. The `YOURS` half is empty on purpose — see below. |
 
@@ -165,7 +218,7 @@ real rather than described.
 
 **Skills** are yours entirely. A skill is a procedure you would otherwise repeat
 by hand. Don't invent one on day 1; you'll know when you need it. The obvious
-candidate turns up on day 2, the second time you turn a failure into a
+candidate turns up on day 3, the second time you turn a failure into a
 regression test — write the steps down once instead of re-deriving them. That's
 SLO 7 as something you can hand to someone else.
 
@@ -179,7 +232,7 @@ team's afternoon; `./run` restores every flight from disk. `./run fresh` if you
 want to start genuinely empty.
 
 **Every decision is kept.** The in-memory log holds the last 400 events; the
-`decisions` table holds all of them, indexed by flight and by actor. On day 2
+`decisions` table holds all of them, indexed by flight and by actor. On day 3
 that is how you answer *"is this my fault or upstream?"* — SLO 2, fault
 isolation — without reading anybody's code:
 
@@ -222,9 +275,9 @@ if not ok:
 
 ---
 
-## How we break it on day 2
+## How we break it on day 3
 
-**We never touch your code.** Not one line, not on day 2, not during the demo.
+**We never touch your code.** Not one line, not on day 3, not during the demo.
 
 Every injection goes through the two things we gave you — the **board** and the
 **feeds**. Your pieces only ever see the world through those two doors, so we
@@ -267,22 +320,35 @@ which skills to work on.
 
 ---
 
-## The two days
+## The three days
 
-**Day 1 — design it, build it, connect it.**
-Fill in `contracts.md` *before any code*. Then build your piece to what was
-agreed, and get it running somewhere a teammate can reach — not just on your
-laptop. Connect it end to end.
+**Day 1 — understand it.** *Nobody writes a service.*
+Run what we gave you and watch it. Follow one flight through the board's decision
+log. Read what is wrong with the piece you are taking. Watch two failures land
+without fixing them. Then fill in `contracts.md` together, and the board keeper
+deploys the board. **Step by step: [DAY-1.md](DAY-1.md).**
+*Done when: every person can explain the problem in their own words,
+`contracts.md` is filled in with every row owned, and the deployed board is
+reachable by all five.*
+
+**Day 2 — build it and connect it.**
+Build your piece to what was agreed on day 1 — the contract already exists, so you
+start writing code, not arguing about field names. Get it running somewhere a
+teammate can reach, not just on your laptop.
 *Done when: every piece is reachable, and the board runs start to finish — even
 if it's rough.*
 
-**Day 2 — break it, fix it, show it.**
+**Day 3 — break it, fix it, show it.**
 Write a test for your piece. We inject the failures. Work out which piece broke
 and whose it is, then handle it so one broken piece doesn't quietly take the rest
 down. **Every failure becomes a test.** Then a live demo — with a failure
 injected during it.
 *Done when: no double-books, survives the injected failures, and bends instead of
 breaking.*
+
+Day 1 is new, and it is there because it was the missing piece last time: teams
+who were good at this went straight to building and spent the back half
+discovering they had solved the wrong problem.
 
 ---
 
