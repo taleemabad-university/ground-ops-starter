@@ -4,6 +4,7 @@
     python run.py board              ONLY the board + feeds      (whoever hosts it for the team)
     python run.py mine assigner-A    ONLY your piece, pointed at $BOARD_URL from team.env
     python run.py fresh [mode]       same, but wipe board.db first (the board persists!)
+    python run.py me                 print YOUR address, the one a teammate can reach
 
 On a four-person team you almost always want the last one. There is ONE board.
 
@@ -112,6 +113,14 @@ def main(argv):
         describe()
         print()
         return subprocess.call([PY, "-m", *PIECES[piece]], cwd=str(ROOT))
+
+    if mode in ("me", "whoami", "address"):
+        ip = my_ip()
+        print(f"\n  your address, the one a TEAMMATE can reach:  {ip}\n")
+        print("  put it in team.env on your line, with your port:")
+        print(f"    ASSIGNER_A_URL=http://{ip}:8101   (or B :8102, replanner :8103, monitor :8104)\n")
+        print("  not 127.0.0.1 and not localhost — those only mean 'this machine'.\n")
+        return 0
 
     if mode == "board":
         print("hosting the board for the team. everyone points BOARD_URL here.")

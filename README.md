@@ -115,8 +115,8 @@ Everyone clones the same repo. Then each person owns exactly one role:
    **answering**. If one says *no answer*, that piece is not reachable yet — and
    that is SLO 4, not a detail.
 
-Your address is not `localhost` — that only means "this machine". On mac,
-`ipconfig getifaddr en0` gives you the one a teammate can actually reach.
+Your address is not `localhost` — that only means "this machine". Run `./run me`
+(Windows: `.\run.cmd me`) and it prints the one a teammate can actually reach.
 
 ### Getting off your laptop
 
