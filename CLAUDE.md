@@ -104,6 +104,29 @@ API, and the board persists. Never open the database file for writing.
   anything keeping its own clock won't even notice.
 - Fail loudly and keep running. Catch, log with enough context to debug later,
   continue. A service that exits has dropped out of the system.
+- **Never hold a lock across a network call.** `/state` is served from the same
+  process as your main loop. If you guard your state with a lock and hold it across
+  a `board.claim()` — which gets 4 seconds — `/state` cannot answer, and the harness
+  scores your piece as absent while it is running perfectly.
+
+### Timing — the budgets that decide whether you are "alive"
+
+**Two different things here are called a "timeout".** Do not confuse them:
+the harness's HTTP budget is in **real seconds** and is about being reachable (SLO 4);
+the monitor's fallback timer is in **board-minutes** and is about deciding instead of
+hanging (SLO 6).
+
+| What | Budget | Where |
+|---|---|---|
+| harness → your `/state` | **automatic**: `max(2s, /health × 8)`, capped at 10s | `harness/verdict.py` |
+| harness → the board | 3s | `harness/verdict.py` |
+| your piece → the board | 4s | `board/client.py` |
+| the board's clock | 1 board-minute per **6 real seconds** | `board/state.py` |
+
+The harness times `/health` first — a constant dict that never touches your code — so
+it measures the network alone, then derives the `/state` budget from it. On localhost
+that is 2.0s. If `/health` is fast and `/state` is slow, the network is fine and your
+`state_fn` is the problem.
 
 ## Commands
 

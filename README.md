@@ -361,23 +361,159 @@ Because it all comes in from outside, anything your piece *assumes* about the
 world we can make untrue without warning, in front of an audience. Handle the
 answers the board gives you and none of it can hurt you.
 
-### What counts as surviving
+### What counts as surviving — all five verdicts
 
 `harness/verdict.py` reads the board, and reads the `/state` and `/log` your own
 pieces expose. It never opens your source.
 
-| Check | Fails when |
+```bash
+./inject all       # all five failures, in order, with a scorecard
+./inject verdict   # just check the board as it stands
+./inject history   # every run so far — are you actually improving?
+```
+
+Most scorecards show **4 checks**. `no-gate` shows **5** — `decision made` only runs
+when a scenario has a specific stuck flight to ask about. That is expected, not a bug.
+
+---
+
+#### 1 · `no double-book`
+
+**Checks:** the board never has a gate whose flight disagrees with itself, *and* every
+piece's `/state` agrees with the board about what it is holding.
+
+> `assigner-B thinks PA-450 is on G4, board says TK-709 — its state has split from the board's`
+
+**Cause:** the piece wrote down a claim the board refused. `claim()` returns
+`(ok, reason)`; the shipped naive assigner throws that away. **Whose:** the named
+piece. **Fix:** read the return value and don't record a refused claim as placed —
+pattern 1 in [SELF-HEALING.md](SELF-HEALING.md).
+
+> ⚠️ **This check skips pieces it cannot reach.** An absent piece quietly *passes*
+> here while failing `pieces alive`. If you see that combination, fix reachability
+> first — this check has not actually looked at that piece yet.
+
+#### 2 · `no silent loss`
+
+**Checks:** a flight that *had* a gate or slot and lost it must end up somewhere, or
+have a decision recorded. A flight still queued behind full gates has not been lost —
+it was never placed.
+
+> `2 flight(s) were placed and then came off the board with no decision: EK-621, QR-118`
+
+**Cause:** something released or evicted a flight and nothing picked it up. **Whose:**
+whoever released it — check `/decisions?flight=…`. **Fix:** every release needs a
+follow-up.
+
+> `window too short to judge` — the board was unreachable for most of the window, so
+> the check abstains rather than fails. **Fix the board first**; this verdict is not
+> telling you anything about your piece.
+
+#### 3 · `board converges`
+
+**Checks:** the board settles. Measured **against how busy it was before the
+injection**, because a healthy steady rate depends on how you built it — an absolute
+ceiling would be unfair across teams.
+
+**Threshold:** `baseline × 2.5` when there is a baseline, otherwise the absolute
+`RUNAWAY_WRITES_PER_SEC = 25`.
+
+> `board still taking 31 writes/sec at the end of the window (was 0.8/s before the injection) — it is not settling, it is spinning`
+
+**Cause:** no damping, or too wide a blast radius — a re-plan triggers a board change,
+which looks like a change, which triggers a re-plan. **Whose:** the re-planner.
+**Fix:** patterns 2 and 3 in [SELF-HEALING.md](SELF-HEALING.md).
+
+#### 4 · `pieces alive`
+
+**Checks:** every piece in `team.env` answers `/state` inside its budget. A piece
+nobody can reach is a piece that dropped out — that is SLO 4, not a detail.
+
+It now tells you **which way** it was unreachable:
+
+```
+FAIL  pieces alive
+      assigner-A [refused] http://127.0.0.1:8101 — nothing is listening there —
+                  is it running? is team.env right?
+      monitor [too slow] http://10.0.1.9:8104 — /health answered in 4ms so the
+                  network is fine, but /state took longer than 2.0s — your
+                  state_fn is blocking. holding a lock across a board call?
+```
+
+| What you see | What it means |
 |---|---|
-| no double-book | A piece's state disagrees with the board about who holds what |
-| no silent loss | A flight ends up nowhere with no decision recorded |
-| board converges | The board is still being hammered at the end of the window — it's spinning, not settling |
-| pieces alive | Something stopped answering instead of degrading |
-| decision made | A stuck flight was never held or diverted — it just hung |
+| `[refused]` | Nothing listening. Not running, or the wrong address in `team.env`. |
+| `[too slow]` | It answered `/health` fine, so the network is not the problem — **your `state_fn` is blocking**. |
+| `[no answer]` | Address is right, nothing came back. Firewall, or the host is down. |
+| `[bad response]` | It replied, but not with JSON the harness could read. |
+| `[http 5xx]` | It answered with an error instead of state. |
+
+**See "My piece is running but scores as absent" below.**
+
+#### 5 · `decision made` — `no-gate` only
+
+**Checks:** the stuck flight was actually decided — `held` or `divert` — rather than
+left hanging.
+
+> `AI-201 is still 'waiting' with nowhere to go — nothing timed out, nothing chose a backup, it just hung`
+
+**Cause:** no timer, or a timeout written in wall-clock seconds that never fires.
+**Whose:** the monitor. **Fix:** pattern 4 in [SELF-HEALING.md](SELF-HEALING.md), and
+**put the timeout in board-minutes**.
+
+#### And one that is not a verdict
+
+> `check blew up: KeyError('gates')`
+
+The check itself raised. Almost always a piece returning a shape the harness could not
+read. It counts as a fail — fix the shape.
+
+---
+
+### Timing — every budget in one place
+
+Two different things in this repo are called a "timeout", and confusing them costs
+people an afternoon:
+
+- **The harness's HTTP budget** is in **real seconds** and is about *being reachable*
+  (SLO 4).
+- **The monitor's fallback timer** is in **board-minutes** and is about *deciding
+  instead of hanging* (SLO 6).
+
+| What | Budget | Where |
+|---|---|---|
+| harness → your `/state` | **automatic**: `max(2s, /health × 8)`, capped at 10s | `harness/verdict.py` |
+| harness → the board | 3s | `harness/verdict.py` |
+| your piece → the board | 4s | `board/client.py` |
+| the board's clock | 1 board-minute per **6 real seconds** | `board/state.py` |
+
+**Why the `/state` budget is automatic.** A piece on your laptop and a piece deployed
+behind a load balancer don't deserve the same stopwatch, so the harness times
+`/health` first — a constant dict that never touches your code, which measures the
+*network alone* — and gives `/state` a budget derived from it. On localhost that lands
+on the floor: **2.0 seconds**. On a slow link it stretches. The gap between the two is
+the diagnosis: if `/health` is fast and `/state` is slow, the network is fine and your
+code is the problem.
+
+### My piece is running but scores as absent
+
+The single most common one. Time it yourself:
 
 ```bash
-./inject all       # all five, in order, with a scorecard
-./inject verdict   # just check the board as it stands
+time curl -s localhost:8101/health    # the network only
+time curl -s localhost:8101/state     # the network AND your state_fn
 ```
+
+- **Both fast, still failing?** The harness isn't reaching the address in `team.env`.
+  `localhost` only means "this machine" — run `./run me` for the one a teammate can
+  actually reach.
+- **`/health` fast, `/state` slow?** Your `state_fn` is blocking. The usual cause: a
+  lock held across a board call. `board.claim()` gets **4 seconds**, and `/state`
+  cannot answer while you hold that lock — so a piece that is running perfectly gets
+  scored as dead. **Never hold a lock across a network call.**
+- **Both slow?** A slow link. The budget stretches automatically, up to 10s.
+
+---
 
 Almost nobody passes all five cold. **That is the point** — it shows exactly
 which skills to work on.

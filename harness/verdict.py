@@ -33,12 +33,87 @@ def board():
     return _get(f"{BOARD_URL}/board")
 
 
+# ── how long a piece gets to answer ──────────────────────────────────────────
+# NOT a fixed number. The runaway check is baseline-relative because an absolute
+# writes/sec ceiling is unreliable across teams; an absolute HTTP budget has the
+# same flaw. A piece on localhost and a piece deployed behind a load balancer do
+# not deserve the same stopwatch.
+#
+# So: time /health first. It returns a constant dict and never touches the
+# learner's state_fn, which makes it a measurement of the NETWORK alone. /state
+# then gets a budget derived from that, and the gap between the two IS the
+# diagnosis:
+#
+#   /health fast, /state slow  -> their state_fn blocks. a lock held across a
+#                                 board call (client.py gives those 4s), or I/O.
+#   both slow                  -> slow link, not their code. budget stretches.
+#   refused / timed out        -> nothing listening, or the wrong address.
+#
+# On localhost /health answers in ~2ms, so the budget lands on the floor of 2.0s
+# — exactly what it has always been. Only genuinely slow links get more room.
+PIECE_BUDGET_FLOOR = 2.0
+PIECE_BUDGET_CEILING = 10.0
+LATENCY_MULTIPLIER = 8
+
+_reach = {}                 # name -> (state|None, why, detail) for ONE report
+
+
+def budget_for(latency):
+    """The /state budget implied by a measured /health round trip."""
+    return min(PIECE_BUDGET_CEILING, max(PIECE_BUDGET_FLOOR, latency * LATENCY_MULTIPLIER))
+
+
+def _why_unreachable(exc):
+    """Say what actually went wrong, in the learner's words not urllib's."""
+    import socket
+    import urllib.error
+    if isinstance(exc, urllib.error.HTTPError):
+        return "http %d" % exc.code, "it answered, but with an error, not state"
+    if isinstance(exc, ValueError):          # json.JSONDecodeError subclasses this
+        return "bad response", "it answered, but not with JSON the harness could read"
+    inner = getattr(exc, "reason", exc)
+    if isinstance(inner, (socket.timeout, TimeoutError)) or "timed out" in str(inner).lower():
+        return "no answer", "the address is right but nothing came back — firewall, or host down"
+    if isinstance(inner, (ConnectionRefusedError, ConnectionResetError)) or "refused" in str(inner).lower():
+        return "refused", "nothing is listening there — is it running? is team.env right?"
+    return "unreachable", str(inner)[:60]
+
+
+def _probe(name):
+    """(state|None, why, detail). Cached per report so every check agrees."""
+    url = PIECES[name]
+    t0 = time.monotonic()
+    try:
+        _get(f"{url}/health", timeout=PIECE_BUDGET_CEILING)
+    except Exception as e:                                    # noqa: BLE001
+        why, detail = _why_unreachable(e)
+        return None, why, detail
+    latency = time.monotonic() - t0
+    allowed = budget_for(latency)
+
+    try:
+        state = _get(f"{url}/state", timeout=allowed)
+    except Exception as e:                                    # noqa: BLE001
+        why, detail = _why_unreachable(e)
+        if why == "no answer":
+            return None, "too slow", (
+                f"/health answered in {latency * 1000:.0f}ms so the network is fine, "
+                f"but /state took longer than {allowed:.1f}s — your state_fn is "
+                f"blocking. holding a lock across a board call?")
+        return None, why, detail
+    if not isinstance(state, dict):
+        return None, "bad response", "/state did not return a JSON object"
+    return state, "ok", f"{latency * 1000:.0f}ms"
+
+
 def piece(name):
     """-> dict | None (None means it did not answer, which is itself a result)."""
-    try:
-        return _get(f"{PIECES[name]}/state", timeout=2)
-    except Exception:
-        return None
+    if name not in _reach:
+        try:
+            _reach[name] = _probe(name)
+        except Exception:                                     # noqa: BLE001
+            _reach[name] = (None, "unreachable", "probe failed")
+    return _reach[name][0]
 
 
 def watch(seconds, every=0.5):
@@ -121,10 +196,19 @@ def check_converges(samples, baseline=None, **_):
 
 
 def check_pieces_alive(samples, **_):
-    """Fail loudly and KEEP GOING. A piece that died is a piece that dropped out."""
-    dead = [n for n in PIECES if piece(n) is None]
+    """Fail loudly and KEEP GOING. A piece nobody can reach is a piece that dropped out.
+
+    The verdict is unchanged — unreachable is unreachable. What changed is that we
+    now say WHICH way it was unreachable, because "not answering" sent people off
+    debugging a piece that was running perfectly.
+    """
+    dead = []
+    for name in PIECES:
+        if piece(name) is None:
+            _, why, detail = _reach[name]
+            dead.append(f"{name} [{why}] {PIECES[name]} — {detail}")
     if dead:
-        return False, f"not answering: {', '.join(dead)} — died instead of degrading"
+        return False, "not answering:\n" + "\n".join(f"      {d}" for d in dead)
     return True, f"all {len(PIECES)} pieces still answering"
 
 
@@ -152,6 +236,7 @@ CHECKS = {
 
 
 def run(samples, want=None, flight=None, baseline=None):
+    _reach.clear()          # one reachability picture per report, shared by every check
     want = want or [k for k in CHECKS if k != "decision made"]
     results = []
     for name in want:

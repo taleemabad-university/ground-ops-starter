@@ -88,6 +88,10 @@ broken, and that is the race bug.
 | A flight sits `waiting` forever, never held or diverted | Monitor | "No timer, or a timeout in wall-clock seconds that never fires." |
 | A flight was placed, came off the board, no decision recorded | Whoever released it — check `/decisions` | "This flight is lost. Your release has no follow-up." |
 | A piece stops answering `/health` | That piece | "You exited instead of degrading. Catch, log, continue." |
+| `pieces alive` says `[refused]` | That piece, or `team.env` | "Nothing is listening on that address. Is it running, and is your `*_URL` line right? `./run me` prints the reachable one." |
+| `pieces alive` says `[too slow]` | That piece | "`/health` answered fine, so the network is OK — your `state_fn` is blocking. Are you holding a lock across a board call? Those get 4s; `/state` has ~2s." |
+| `pieces alive` says `[no answer]` | Network / that host | "The address resolves but nothing comes back — firewall, or the host is down." |
+| `no double-book` passes but `pieces alive` fails | Reachability first | "That check *skips* pieces it cannot reach, so its pass means nothing yet. Fix reachability, then re-run." |
 
 ## How to hand it over
 

@@ -75,6 +75,11 @@ right behaviour is to make a call anyway: `board.flag(flight, "held", reason)` o
 seconds, so a timeout you wrote in wall-clock seconds will never fire inside the
 window we test in. This has caught every cohort so far.
 
+> **Two different timeouts, don't mix them up.** *This* one — the monitor's fallback
+> timer — is in **board-minutes** and is about deciding instead of hanging. The
+> *harness* also has a timeout: a **real-seconds** budget for your `/state` to answer,
+> which is about being reachable. See "Timing" in the README.
+
 **Fails without it:** `decision made`. This is the dead end.
 
 ---
