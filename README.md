@@ -17,6 +17,11 @@ board.
 **Start at [DAY-1.md](DAY-1.md)** — and don't write a service before you've been
 through it.
 
+**Not sure what `held` or `divert` mean?** Every word this repo uses — the flight
+statuses, the log events, the exact string the board sends back when it refuses you —
+is defined in **[The words we use](#the-words-we-use)** at the end. Start there, not
+in the source.
+
 ---
 
 ## Get it running
@@ -110,30 +115,130 @@ Everyone clones the same repo. Then each person owns exactly one role:
 *Four people instead of five? The board keeper doubles as the monitor — both are
 observability roles.*
 
-### The board keeper
+Below, every role in the same shape: what you own, what you decide, which healing
+pattern is yours, which failure is aimed at you, and which verdict will say your name
+out loud on day 3. Read your own block, then read the one either side of you — those
+are the people you have a contract with.
+
+### assigner A · assigner B
+
+Two people, the same file, two instances running at the same time. **They compete for
+gates on purpose.**
+
+- **Owns** — `assigners/`. Read the header of `assigners/naive.py` first: it says
+  exactly what is wrong with the version that ships.
+- **Decides** — which flight parks at which gate. `POST /claim {flight, gate, actor}`.
+- **Runs** — `./run mine assigner-A` on `:8101`, `./run mine assigner-B` on `:8102`.
+- **Your healing pattern** — **retry on refusal** (pattern 1). A `409` means the other
+  assigner got there first and *the board did not change*. The question is what happens
+  to the flight you did not place.
+- **The failure aimed at you** — `race`: two claims hit the last free gate in the same
+  instant.
+- **The verdict that names you** — `no double-book`, and `no silent loss` for the
+  flight you dropped. It says your name:
+
+  > `assigner-B thinks PA-450 is on G4, board says TK-709 — its state has split from the board's`
+
+- **Your row in `contracts.md`** — `assigner → board`, written by **A and B
+  together**: the claim shape, what each of you does on a 409, and how you divide the
+  work so you are not both grabbing G1 every tick.
+- **Done when** — a refused claim leaves the flight back in play, and your `/state`
+  never claims a gate the board didn't give you.
+
+### the re-planner
+
+One flight slipped, so the flights behind it have to be redone. The hard part is
+stopping.
+
+- **Owns** — `replanner/`. The header of `replanner/naive.py` lists three things wrong
+  with it.
+- **Decides** — which flights a delay *actually* touched, and re-issues their runway
+  slots. `POST /slot {flight, slot, actor}`.
+- **Runs** — `./run mine replanner` on `:8103`.
+- **Your healing patterns** — **damping** (pattern 2) *and* **blast radius**
+  (pattern 3). You are the only role with two, because you are the only piece whose
+  own writes can set off its own next run.
+- **The failure aimed at you** — `bad-clock`: the board clock jumps 47 minutes forward,
+  so every flight looks late at once. The piece whose whole job is fixing the board is
+  the piece most likely to melt it.
+- **The verdict that names you** — `board converges`:
+
+  > `board still taking 31 writes/sec at the end of the window (was 0.8/s before the injection) — it is not settling, it is spinning`
+
+- **Your row in `contracts.md`** — `re-planner → board`: which writes you make, your
+  **blast-radius rule in one sentence**, and your **damping rule with a number in
+  it** — at most one re-plan per flight per N board-minutes. Both are contracts, not
+  implementation details.
+- **Done when** — a delay moves the flights it touched and nothing else, and the board
+  goes quiet again afterwards.
+
+### the monitor
+
+The piece that notices nothing is happening, and makes a call anyway.
+
+- **Owns** — `monitor/`, and `tests/`. The header of `monitor/naive.py` lists four
+  things wrong with it, and one of them is "no tests".
+- **Decides** — when a flight has waited too long, and what to do about it.
+  `POST /flag {flight, decision, reason}`, where `decision` is `held` or `divert` and
+  nothing else.
+- **Runs** — `./run mine monitor` on `:8104`.
+- **Your healing pattern** — **timeout → fallback** (pattern 4). Waiting forever is
+  the same as crashing, except harder to notice.
+- **The failure aimed at you** — `no-gate`: a flight arrives, every gate is full, and
+  nothing ever opens up. There is no right answer available — making a call regardless
+  *is* the answer.
+- **The verdict that names you** — `decision made`, the fifth check, which only runs
+  for this scenario:
+
+  > `ZZ-999 is still 'pending' with nowhere to go — nothing timed out, nothing chose a backup, it just hung`
+
+- **Your row in `contracts.md`** — `monitor → board`: the flag shape, the allowed
+  decision values, and your **timeout in board-minutes**. Not seconds — the board's
+  clock runs one minute per six real seconds, so a wall-clock timeout silently never
+  fires inside the window we test in. This has caught every cohort so far.
+- **Done when** — no flight can sit undecided, and your log says what you decided and
+  why.
+
+### the board keeper — team lead
 
 The board is **given code that nobody edits**, including the board keeper. What the
-board keeper owns is *running* it, and leading the team while it runs:
+board keeper owns is *running* it, and leading the team while it runs. **The board
+keeper is a person, not a piece of code.**
 
-- **Deploys the board** off a laptop, so it doesn't sleep and take the team's day
-  with it. `Procfile` and `railway.toml` ship in the repo and the board respects
-  `$PORT`. This is SLO 4 done more concretely than anyone else on the team does it.
-- **Owns `team.env`** and every address in it.
-- **Owns `contracts.md`** and its change log — SLO 11.
-- **Answers "is the board healthy", for every piece.** Not by reading a teammate's
-  source — by reading the evidence the board already keeps:
+- **Owns** — the deploy, `team.env` and every address in it, `contracts.md` and its
+  change log (SLO 11), and the answer to "is the board healthy". Not `board/` — nobody
+  owns that.
+- **Decides** — nothing about flights. Whose problem a failure is.
+- **Runs** — `./run board`: the **one** board for the whole team, on `:8080`.
+- **Your pattern** — none of the four; those belong to the pieces. Yours is the
+  **deploy**, which is SLO 4 done more concretely than anyone else on the team does
+  it. `Procfile` and `railway.toml` ship in the repo and the board respects `$PORT`,
+  so it goes up as-is. **Day 1 job** — see "Getting off your laptop" below.
+- **The failure aimed at you** — all five, indirectly. Every injection enters through
+  the board or the feeds, so you see it land first and route it.
+- **The verdict that names you** — `pieces alive`, when an address in `team.env` is
+  wrong; and `no silent loss` when it abstains with *"window too short to judge"* —
+  that one means **the board** was unreachable, so fix the board before you read
+  anything into the rest of the score.
+- **Your rows in `contracts.md`** — "Who owns what" (names, ports, health-check URLs,
+  the deployed board address) and `board → everyone` (the 200 / 409 shapes every writer
+  has to handle). You also **chair** the day-1 contract session and the day-3 demo.
+- **Done when** — all five of you load the same deployed board and see the same
+  flights.
 
-  ```bash
-  ./inject verdict                              # the five checks, right now
-  curl -s localhost:8080/log                    # what the board saw
-  curl -s "localhost:8080/decisions?flight=PK-304"   # one flight's whole life
-  ```
+**Answering "is the board healthy", for every piece.** Not by reading a teammate's
+source — by reading the evidence the board already keeps:
 
-  "The board isn't settling" goes to the re-planner. "Assigner B's state has split
-  from the board" goes to assigner B. "AI-201 hung and nobody decided" goes to the
-  monitor. Same evidence everybody else can see, so it is a diagnosis and not an
-  opinion.
-- **Chairs** the day-1 contract session and the day-3 demo.
+```bash
+./inject verdict                              # the five checks, right now
+curl -s localhost:8080/log                    # what the board saw
+curl -s "localhost:8080/decisions?flight=PK-304"   # one flight's whole life
+```
+
+"The board isn't settling" goes to the re-planner. "Assigner B's state has split
+from the board" goes to assigner B. "AI-201 hung and nobody decided" goes to the
+monitor. Same evidence everybody else can see, so it is a diagnosis and not an
+opinion.
 
 ### Getting off your laptop
 
@@ -232,6 +337,42 @@ both need a number in them: **the re-planner's damping rule** (it decides how ha
 the board gets written to, and the board settling is one of the five things we
 score) and **the monitor's timeout in board-minutes** (the board's clock runs one
 minute per six real seconds, so a timeout in wall-clock seconds never fires).
+
+---
+
+## Scope — what we model, and what we don't
+
+**The whole system in one sentence:** flights arrive on a feed, something has to give
+each one a gate to park at and a runway slot to use, and that plan has to redo itself
+when a flight runs late.
+
+**What we model.** Six gates, `G1`–`G6`. Four runway slots, `R1`–`R4`. Arrivals and
+departures. An ETA in board-minutes. A delay. A re-plan. A safe fallback. A log of
+every decision and who made it. **That is the entire world your pieces can see** —
+through two doors, the board and the feeds, and nothing else.
+
+**What we deliberately don't model.** None of this is an oversight:
+
+| Not in this build | Which means |
+|---|---|
+| baggage, crew, fuel, catering, de-icing | there is no resource to contend for except the gate and the slot |
+| passengers, boarding, connections, misconnects | a flight is an id, a kind, an ETA and a status |
+| pushback, taxi, turnaround time | a gate is held until somebody releases it — there is no "eight minutes to clean the aircraft" |
+| weather, real ATC, ground stops | delays and closures arrive from the harness, not from a model of the world |
+| aircraft types and sizes | **any flight fits any gate**, and any slot |
+| terminals, walking distance, airline preference | all six gates are equally good, so there is no *best* gate — only a free one |
+| cost, fairness, on-time percentage | there is nothing to optimise. There are two hard rules not to break, and five verdicts to survive |
+
+Every one of those is a scope decision **already made for you**, so that the only hard
+part left is the one you are actually scored on: keeping four services correct while
+the world changes underneath them. If your build seems to need one of these, the change
+is wrong — the same rule that applies to the board itself.
+
+**What is still yours to scope.** Three lines in `contracts.md` under *What we are NOT
+building*, and the v1 under *MVP / roadmap*. Decided out loud on day 1, before anyone
+is tired, and held by the board keeper when time runs short. That is SLO 8 and SLO 9,
+and scoping is one of the four things that decides graduation — so those three lines
+are not a formality.
 
 ---
 
@@ -455,7 +596,7 @@ FAIL  pieces alive
 **Checks:** the stuck flight was actually decided — `held` or `divert` — rather than
 left hanging.
 
-> `AI-201 is still 'waiting' with nowhere to go — nothing timed out, nothing chose a backup, it just hung`
+> `ZZ-999 is still 'pending' with nowhere to go — nothing timed out, nothing chose a backup, it just hung`
 
 **Cause:** no timer, or a timeout written in wall-clock seconds that never fires.
 **Whose:** the monitor. **Fix:** pattern 4 in [SELF-HEALING.md](SELF-HEALING.md), and
@@ -583,3 +724,182 @@ If the board's log and your piece's log disagree, **the board is right.** Work
 backwards from there — and tell whoever owns the piece feeding into yours, plainly
 and early. That's SLO 11, and it is the difference between a ten-minute fix and
 losing an afternoon.
+
+---
+
+## The words we use
+
+Every word below appears in the code, on the board page, or in a verdict message.
+Where it is a real airport word, the real meaning is here too — because knowing what
+a controller means by "hold" is most of knowing why the monitor exists.
+
+### A flight's status
+
+Five values, defined in `board/state.py`. A flight is always in exactly one of them.
+
+| Status | At a real airport | Here | Who sets it |
+|---|---|---|---|
+| `pending` | in the schedule, nothing arranged for it yet | the board knows the flight; it has no gate | the feeds when it arrives — and the board itself, whenever a flight loses its gate |
+| `gated` | parked at a stand | holds a gate, no runway slot yet | an assigner, `POST /claim` |
+| `slotted` | parked, and cleared for a runway window | holds a gate **and** a runway slot | the re-planner, `POST /slot` |
+| `held` | told to wait — on the tarmac, or in a holding pattern | **decided to wait**: nowhere to go, and the monitor said so out loud | the monitor, `POST /flag` |
+| `divert` | sent to a different airport | this airport cannot place it at all | the monitor, `POST /flag` |
+
+`pending` is the one people misread. It does not mean lost and it does not mean
+broken — a flight queued behind full gates is `pending`, and that is correct. It
+becomes a problem only when nothing ever changes it. Two details worth knowing:
+`GET /unassigned` lists exactly these flights (`pending`, no gate), so a flight
+drops off that queue the moment the monitor flags it; and a flight can hold a runway
+slot while still `pending`, because `slotted` means *both*.
+
+**So what do `held` and `divert` actually mean?**
+
+**`held`** — the plane waits. Real ops hold an aircraft on the tarmac when there is
+nowhere to put it yet, or in a holding pattern in the air when the ground is not
+ready. A hold solves nothing by itself; it buys time, and — this is the part that
+matters here — **somebody has decided that this aircraft is waiting, and written down
+why**. In this repo it is the monitor's safe fallback for a flight with nowhere to go:
+a recorded decision to wait, which is not the same thing as a hang.
+
+**`divert`** — the flight goes somewhere else. Real ops divert when the destination
+genuinely cannot take the aircraft: the runway is shut, the weather is below limits,
+no stand will free up in time, the fuel margin is gone. It is expensive, and it is not
+a failure — it is the correct answer when the alternative is circling until something
+worse happens. Here it is the monitor's other fallback, for a flight this airport
+cannot place at all.
+
+The pair matters because they are **the only two values `POST /flag` accepts** — the
+board refuses anything else with `bad_decision` — and because the `decision made`
+verdict passes only if the stuck flight ended in one of them. **Doing nothing is not a
+third option.** A flight left `pending` forever fails that check, and that is the whole
+of SLO 6: decide something, say so, keep running.
+
+### Places and things
+
+| Word | What it is |
+|---|---|
+| **gate** | Where the aircraft parks. `G1`–`G6`. **One gate holds one flight, ever** — the board enforces it, you don't. At a real airport this is a *stand*; "gate" is the door the passengers walk through, and the two get used interchangeably. |
+| **runway slot** | Permission to use the runway in a particular window. `R1`–`R4`. **One slot holds one flight, ever.** At a real airport ATC issues these, and missing yours means waiting for another; here it is simply an exclusive reservation. |
+| **closed slot** | A runway taken out of service. `./inject close-runway` shuts `R3` and `R4`, evicts whoever held them, and every later claim on them comes back `slot_closed`. The board page shows it as `runway shut`. |
+| **the tarmac** | The paved ground outside the gates. In this repo it is where a `held` flight waits — there is no tarmac in the data model, only the status. |
+| **the board** | The one shared source of truth: which flight is at which gate, in which slot, and every decision ever made about it. There is exactly **one** for the team, and it is not on your laptop. The real-world equivalent is the ops board the whole ramp works from. **If it and your piece disagree, the board is right.** |
+| **the feeds** | Live arrivals and departures. They overlap and repeat the same flight, because real feeds do; de-duplicating them is the board's job — that is `duplicate_merged` in the log, not an error. |
+| **piece** · **service** · **role** | Used interchangeably here. A *piece* is one of the four programs; a *role* is the person who owns it. |
+
+### A flight's facts
+
+| Field | What it means |
+|---|---|
+| `id` | The flight number: airline code plus number. The feed uses real codes — `PK` Pakistan International, `EK` Emirates, `QR` Qatar, `TK` Turkish, `SV` Saudia, `AI` Air India, `BA` British Airways, `LH` Lufthansa, `PA` Pan Am — so the board reads like a real one. Nine flights, and three of them come down the feed twice. |
+| `kind` | `arrival` or `departure`. Both need a gate and a slot; the difference is which end of the visit you are looking at. |
+| `eta_min` | Minutes past the hour, **on the board's clock**. Not a wall-clock time. |
+| `delay_min` | How far the harness has pushed this flight back. A delay of 60 minutes or more makes a flight miss its runway slot — **the slot opens up, the gate does not**, and that is what starts the cascade. |
+| `decided_by` | Which piece made the last call on this flight. Your name ends up in here, which is how a verdict can tell whose problem something is. |
+| `reason` | The free text the monitor writes with a `held` or a `divert`. The one field that exists purely to be read by a human afterwards — so write it like someone will. |
+
+One id is not in that feed: **`ZZ-999`**. The `no-gate` injection invents it on the day
+as the flight with nowhere to go, so it is the flight the `decision made` verdict asks
+you about. If you see it on the board, you are being tested.
+
+### Time
+
+The board keeps its own clock, and you read time from there.
+
+| Word | What it means |
+|---|---|
+| **board-minute** | The board's unit of time. **One board-minute per six real seconds** — so a 20-board-minute timeout fires after two real minutes. |
+| **the board clock** | `GET /now`. Read time from here, never from `datetime.now()`. |
+| **clock skew** | `./inject bad-clock` jumps the board clock 47 minutes forward. A piece keeping its own clock will not even notice, which is exactly the point. |
+| **"timeout"** | **Two different things share this word.** The monitor's fallback timer is in *board-minutes* and is about deciding instead of hanging (SLO 6). The harness's HTTP budget is in *real seconds* and is about being reachable (SLO 4). Every budget is in one table under [Timing](#timing--every-budget-in-one-place). |
+
+### What you'll read in `/log` and `/decisions`
+
+The board writes a line for everything that happens, and on day 3 these lines are all
+you get. Learn them on day 1.
+
+| Event | What happened |
+|---|---|
+| `inbound` | The feed announced a flight the board had not seen before. |
+| `duplicate_merged` | The feed announced one it already had. Normal. |
+| `claim_ok` | An assigner took a gate. |
+| `claim_rejected` | An assigner tried for a gate somebody else holds. **The board did not change.** |
+| `slot_ok` · `slot_rejected` | The same two, for a runway slot. |
+| `release_gate` | A gate was given back. That flight is `pending` again — somebody has to pick it up. |
+| `fallback` | The monitor flagged a flight `held` or `divert`. |
+| `delay` | The harness pushed a flight back. |
+| `close_runway` | The harness shut runway slots and evicted whoever held them. |
+| `clock_skew` | The harness moved the board clock. |
+
+And the `actor` on each line — who did it:
+
+`feed` · `assigner-A` and `assigner-B` · `replanner` · `monitor` · `HARNESS` (us, on
+day 3 — sometimes `HARNESS-setup` or `HARNESS-rogue-assigner`) · and `?`, a write that
+arrived with no actor at all. The name is whatever your piece passed to
+`Board(actor=...)`, so if you ever see `?`, your own code is not sending one.
+
+```bash
+curl -s localhost:8080/log                          # the last 50, newest last
+curl -s "localhost:8080/decisions?flight=PK-304"    # one flight's whole life, from SQLite
+```
+
+### When the board says no
+
+Every write can be refused. A refusal comes back `409` when the write would have
+broken a rule, `400` when the request itself was malformed, and `404` for a path that
+does not exist — always with a `reason`, and these are the exact strings:
+
+| `reason` | What it means |
+|---|---|
+| `gate_occupied` | Somebody holds that gate. The response also carries `holder`: the flight that has it. |
+| `slot_occupied` | Somebody holds that runway slot. |
+| `slot_closed` | That runway is shut. See `close-runway`. |
+| `unknown_flight` | No flight with that id — a typo, or one the feed has not announced yet. |
+| `unknown_gate` · `unknown_slot` | Not one of `G1`–`G6` · `R1`–`R4`. |
+| `bad_decision` | You flagged something that is not `held` or `divert`. |
+| `bad_json` | The body would not parse. |
+| `missing_<field>` | A required field was absent — e.g. `missing_gate`. |
+| `no_such_route` | Wrong path. The board's routes are listed in `CLAUDE.md`. |
+
+**A 409 is not a log line, it is a fact:** somebody got there first and the board did
+not move. See [The two hard rules](#the-two-hard-rules).
+
+### The words we use for building it
+
+One line each. The full version is wherever the link goes.
+
+| Word | What we mean by it |
+|---|---|
+| **self-healing** | Not a system that never gets hit. One that takes the hit, says so, and keeps going. [SELF-HEALING.md](SELF-HEALING.md) |
+| **retry on refusal** | What you do with the flight you did not place. Pattern 1 — the assigners'. |
+| **damping** | A brake: at most one re-plan per flight per N board-minutes. Pattern 2 — the re-planner's. Needs a number, and the number goes in `contracts.md`. |
+| **blast radius** | Which flights a delay *actually* touched. Pattern 3 — the re-planner's. If you cannot state it in one sentence, you are re-planning the whole board and calling it a strategy. |
+| **timeout → fallback** | When you stop waiting, and what you choose instead. Pattern 4 — the monitor's. In board-minutes. |
+| **split state** | Your piece and the board disagree about the world. Almost always a refused write that got recorded as a success. The verdict phrases it *"its state has split from the board's"*. |
+| **injection** | A failure we cause on day 3, always through the board or the feeds, **never** by touching your code. `./inject late`, and four others. |
+| **injection surface** | Why the board and the feeds arrive finished: they are the only two things your pieces can see, so changing what comes through them tests your build without editing it. |
+| **verdict** | One of the five checks in `harness/verdict.py`. Each one reads the board and your `/state` and `/log` — never your source. |
+| **scorecard** | The result of a run: `4/4  ++++`. Every one is recorded; `./inject history` shows them all. |
+| **absent** | A piece the harness could not reach inside its budget. A piece running perfectly on your own laptop is absent to everyone else — see [My piece is running but scores as absent](#my-piece-is-running-but-scores-as-absent). |
+
+### Real airport words you'll hear, and what we call them
+
+People say these out loud in the room. Only the rows that map to something are in the
+build — don't go looking in the code for the rest.
+
+| You'll hear | In this repo |
+|---|---|
+| stand | **gate** — `G1`–`G6` |
+| ATC slot, departure slot | **runway slot** — `R1`–`R4` |
+| holding pattern, holding on the ground | the status **`held`** |
+| diversion, divert to an alternate | the status **`divert`** |
+| the ops board, the FIDS | **the board**, on `:8080` |
+| cascade, knock-on delay | what `./inject late` causes |
+| runway closure, ground stop | `./inject close-runway` |
+| apron, ramp, taxiway | not modelled — a flight is at a gate or it isn't |
+| turnaround, pushback, off-blocks | not modelled — a gate is held until somebody releases it |
+| load control, weight and balance | not modelled |
+| MCT, misconnect, passenger connections | not modelled — these flights carry no passengers |
+| de-icing, catering, fuelling | not modelled |
+
+Everything marked *not modelled* is out on purpose — see
+[Scope](#scope--what-we-model-and-what-we-dont).

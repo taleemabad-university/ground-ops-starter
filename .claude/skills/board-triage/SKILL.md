@@ -29,7 +29,7 @@ Each failing check already names the piece and the flight:
 ```
 FAIL  no double-book   assigner-B thinks PA-450 is on G4, board says TK-709
 FAIL  board converges  board still taking 31 writes/sec (was 0.8/s before) — spinning
-FAIL  decision made    AI-201 still 'waiting' with nowhere to go — it just hung
+FAIL  decision made    ZZ-999 still 'pending' with nowhere to go — it just hung
 ```
 
 If nothing is failing but something feels wrong, go to step 2 anyway — the checks
@@ -85,7 +85,7 @@ broken, and that is the race bug.
 | A piece's `/state` lists a flight the board gives to someone else | That piece | "You recorded a claim the board refused. Read what `claim()` returns." |
 | Board write rate takes off and stays up | Re-planner | "No damping — every re-plan is triggering the next one. What's your N?" |
 | Many gates churning after one flight slipped | Re-planner | "Blast radius. One flight moved; you re-planned twelve." |
-| A flight sits `waiting` forever, never held or diverted | Monitor | "No timer, or a timeout in wall-clock seconds that never fires." |
+| A flight sits `pending` forever, never held or diverted | Monitor | "No timer, or a timeout in wall-clock seconds that never fires." |
 | A flight was placed, came off the board, no decision recorded | Whoever released it — check `/decisions` | "This flight is lost. Your release has no follow-up." |
 | A piece stops answering `/health` | That piece | "You exited instead of degrading. Catch, log, continue." |
 | `pieces alive` says `[refused]` | That piece, or `team.env` | "Nothing is listening on that address. Is it running, and is your `*_URL` line right? `./run me` prints the reachable one." |
@@ -98,7 +98,7 @@ broken, and that is the race bug.
 Name the evidence, not the person's code. Early and plainly — this is scored (SLO 11),
 and it is the difference between a ten-minute fix and losing an afternoon.
 
-> "AI-201 has been `waiting` since board-minute 34 with no gate and no decision —
+> "AI-201 has been `pending` since board-minute 34 with no gate and no decision —
 > `/decisions?flight=AI-201` shows nothing after the arrival. Monitor's timer looks
 > like it isn't firing. Can you check the timeout is in board-minutes?"
 
