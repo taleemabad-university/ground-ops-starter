@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 board.db
 *.db
+.verdict-history.jsonl

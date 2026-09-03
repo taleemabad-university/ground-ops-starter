@@ -9,7 +9,7 @@ and it does two jobs:
 
   2. EVERY DECISION IS KEPT, FOREVER. The in-memory log holds the last 400
      events. The `decisions` table holds all of them, with an index on flight,
-     so on day 2 you can ask "what actually happened to PK-304, in order, and
+     so on day 3 you can ask "what actually happened to PK-304, in order, and
      which service did it" — instead of guessing from whatever is still on
      screen. That is how you work out whether a fault is yours or upstream
      (SLO 2) without reading anyone's source.
@@ -133,7 +133,7 @@ def all_flights():
 
 
 def history(flight=None, limit=200):
-    """Every decision, oldest first. The day-2 debugging tool."""
+    """Every decision, oldest first. The day-3 debugging tool."""
     q = "SELECT board_min,actor,event,flight,gate,slot,detail FROM decisions"
     args = []
     if flight:

@@ -7,7 +7,7 @@ Two hard rules are enforced here, in one place, under one lock:
 
 Everything you build talks to this through board/api.py over HTTP. That is on
 purpose: it is the only thing all four pieces agree on, and it is where we
-inject failures on day 2 without touching your code.
+inject failures on day 3 without touching your code.
 """
 import threading
 import time
@@ -60,7 +60,7 @@ class Board:
         self.started = time.time()
 
     # ── the board's clock ────────────────────────────────────────────────
-    # Read time from HERE, not from your own datetime.now(). On day 2 we skew
+    # Read time from HERE, not from your own datetime.now(). On day 3 we skew
     # this, and a piece that kept its own clock will not even notice.
     def now_min(self):
         with self._lock:
@@ -190,7 +190,7 @@ class Board:
             self._persist(flight_id)
             return True
 
-    # ── harness surface · day 2 only ─────────────────────────────────────
+    # ── harness surface · day 3 only ─────────────────────────────────────
     def inject_delay(self, flight_id, minutes):
         with self._lock:
             f = self.flights[flight_id]

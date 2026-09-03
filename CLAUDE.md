@@ -25,7 +25,7 @@ requirements.txt. If something seems to need a library, it doesn't.
 `board/` · `feeds/` · `harness/`
 
 These are given, finished, and correct. They are also **the surface failures are
-injected through on day 2** — the board and the feeds are the only things the
+injected through on day 3** — the board and the feeds are the only things the
 four services can see, so changing what comes through them tests the build
 without anyone touching its code. Editing them doesn't make the tests pass; it
 makes the result meaningless.
@@ -80,7 +80,7 @@ install). Two consequences worth knowing:
 - **State survives a restart.** `./run` restores every flight from disk. If you
   genuinely want an empty board, `./run fresh`.
 - **Every decision is kept forever**, not just the last 400 in memory. This is
-  the day-2 debugging tool — it answers "what happened to this flight, in order,
+  the day-3 debugging tool — it answers "what happened to this flight, in order,
   and who did it" without opening anyone's source.
 
 ```bash
@@ -100,7 +100,7 @@ API, and the board persists. Never open the database file for writing.
 - `/state` must match the board. If they disagree, the board is right.
 - Addresses come from `team.env` via `board/config.py`. **Never hardcode a host
   or port** — there is one board for the whole team and it is not on your laptop.
-- Read time from `board.now()`. On day 2 the board's clock gets skewed, and
+- Read time from `board.now()`. On day 3 the board's clock gets skewed, and
   anything keeping its own clock won't even notice.
 - Fail loudly and keep running. Catch, log with enough context to debug later,
   continue. A service that exits has dropped out of the system.
@@ -115,6 +115,7 @@ API, and the board persists. Never open the database file for writing.
 ./inject late             break it (also: close-runway race bad-clock no-gate all)
 ./inject verdict          score the board as it stands right now (the board keeper
                           runs this constantly and routes what it finds)
+./inject history          every run so far — did that fix actually move the number?
 python -m unittest discover -v
 ```
 
@@ -124,6 +125,22 @@ fallback if a wrapper misbehaves. Never assume a POSIX shell in code you write
 here: five people on five different laptops have to run the same repo.
 
 Watch it: <http://localhost:8080/> — the live board, updating as it moves.
+
+## Skills
+
+Three ship in `.claude/skills/` and you should reach for them rather than
+re-deriving the procedure each time:
+
+- **`failure-to-test`** — after `./inject` breaks something: reproduce it, pin it with
+  a test that fails first, fix, confirm.
+- **`board-triage`** — the board is misbehaving and it is not obvious whose fault it
+  is. Reads the board's evidence and names the owner. Never reads a teammate's source.
+- **`self-healing-review`** — audit one piece against the four patterns in
+  `SELF-HEALING.md` before day 3 makes the point for you.
+
+`SELF-HEALING.md` is the four patterns themselves — retry on refusal, damping, blast
+radius, timeout → fallback — written as questions, because working out the answer for
+your own piece is the build.
 
 ---
 
@@ -159,6 +176,10 @@ agent working in here has no way to know it. That is Part A, SLO 3.>
 
 ## Skills we've built
 
-<A skill is a procedure you'd otherwise repeat by hand. The obvious one comes up
-on day 2, the second time you turn a failure into a regression test — write the
-steps down once and stop re-deriving them. That's SLO 7.>
+<Three skills already ship in `.claude/skills/` — read them; they are the worked
+example. SLO 7 is not "invent one from nothing", it is *notice a procedure you keep
+repeating and write it down so it can be handed over*.
+
+So: what did YOUR team keep re-deriving that the three don't cover? The deploy dance,
+the way you read your own logs, the sequence for bringing your piece back after it
+drops out. Write that one, put it in `.claude/skills/`, and name it here.>

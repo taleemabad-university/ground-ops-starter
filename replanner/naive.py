@@ -11,7 +11,7 @@ WHAT IT DOES
 
 WHAT IS WRONG WITH IT
     1. NO DAMPING. There is nothing between "something changed" and "redo it".
-       On day 2 we hand it a clock that runs 47 minutes fast, so every flight
+       On day 3 we hand it a clock that runs 47 minutes fast, so every flight
        looks late, so it re-plans everything, which changes the board, which
        looks like another change, which makes it re-plan again. It is the piece
        whose whole job is to fix the board, and left like this it is the piece

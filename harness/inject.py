@@ -1,4 +1,4 @@
-"""The five injected failures. GIVEN — this is exactly what we run on day 2.
+"""The five injected failures. GIVEN — this is exactly what we run on day 3.
 
     ./inject late            one flight runs 90 minutes late
     ./inject close-runway    a runway shuts and its slots disappear
@@ -6,10 +6,12 @@
     ./inject bad-clock       the board's clock jumps 47 minutes forward
     ./inject no-gate         a flight arrives and nothing ever opens up
     ./inject all             all five, in order, with a scorecard
+    ./inject verdict         score the board as it stands right now
+    ./inject history         every run so far — are you getting better?
 
 READ THIS BIT — it is the whole design.
 
-  We never touch your code. Not one line, not on day 2, not in the demo.
+  We never touch your code. Not one line, not on day 3, not in the demo.
 
   Every injection goes through the two things WE gave you: the board and the
   feeds. Your pieces only ever see the world through those two doors, so we can
@@ -195,9 +197,12 @@ def run_one(key):
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
-        print("  scenarios:", ", ".join(SCENARIOS), "| all | verdict")
+        print("  scenarios:", ", ".join(SCENARIOS), "| all | verdict | history")
         return 0
     cmd = argv[0]
+    if cmd == "history":
+        verdict.show_history()
+        return 0
     if cmd == "verdict":
         return 0 if verdict.report("board right now", verdict.run(verdict.watch(4))) else 1
     if cmd == "all":
@@ -207,7 +212,8 @@ def main(argv):
         for k, ok in results.items():
             print(f"  {'SURVIVED' if ok else 'BROKE   '}  {SCENARIOS[k][1]}")
         print(f"\n  survived {survived}/5 injected failures")
-        print("  almost nobody passes all five cold. that is the point.\n")
+        print("  almost nobody passes all five cold. that is the point.")
+        print("  every run is recorded —  ./inject history  shows whether you are improving.\n")
         return 0 if survived == 5 else 1
     if cmd not in SCENARIOS:
         print(f"unknown scenario: {cmd}\ntry: {', '.join(SCENARIOS)}, all, verdict")

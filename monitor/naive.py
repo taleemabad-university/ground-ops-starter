@@ -13,7 +13,7 @@ WHAT IS WRONG WITH IT
        Nothing is counting how long it has been waiting, so nothing can ever
        decide that it has waited too long.
     2. NO FALLBACK. board.flag(flight, "held" | "divert", reason) is sitting
-       right there and never gets called. On day 2 we hand it a flight and open
+       right there and never gets called. On day 3 we hand it a flight and open
        no gates at all. This will watch that flight sit there until the demo
        ends. A system that hangs quietly has failed just as hard as one that
        crashes — it has just made it harder to notice.
@@ -27,7 +27,7 @@ YOUR JOB
     -> when it runs out, PICK SOMETHING: hold on the tarmac, or flag a divert.
        A safe backup beats hanging every time      graceful degradation (SLO 6)
     -> write down every decision and the reason for it     observability (SLO 6)
-    -> turn each day-2 failure into a test in tests/    regression tests (SLO 7)
+    -> turn each day-3 failure into a test in tests/    regression tests (SLO 7)
 """
 import sys
 import time

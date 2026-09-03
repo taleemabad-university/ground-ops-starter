@@ -3,7 +3,8 @@
 **Nobody writes a service today.**
 
 That is deliberate. Last time round, teams who were good at this went straight to
-building and spent day 2 discovering they had been solving the wrong problem. Today
+building and spent the back half discovering they had been solving the wrong
+problem. Today
 you run the thing we gave you, watch it break, and agree what you are each
 promising the others. Tomorrow you build.
 
@@ -74,6 +75,25 @@ starting point, not your answer.
 If you cannot say it in your own words, do not move on. This is the step that was
 missing last time.
 
+## 3b · Read the four healing patterns
+
+Everyone reads [SELF-HEALING.md](SELF-HEALING.md). It is four questions, one per
+pattern, and each maps to a failure that gets injected on day 3:
+
+| Pattern | Whose | Fails without it |
+|---|---|---|
+| Retry on refusal | assigners | the race |
+| Damping | re-planner | the runaway |
+| Blast radius | re-planner | the runaway |
+| Timeout → fallback | monitor | the dead end |
+
+It also names the three things the repo **already** heals for you, so you can tell
+what you're standing on from what you have to build.
+
+> **Answer, each person:** which of the four is mine, and what is my answer to its
+> question? You don't need the code today — you need the answer, because it goes in
+> `contracts.md` in step 5.
+
 ## 4 · Break it, and do not fix it
 
 ```
@@ -98,6 +118,15 @@ bug you will fix tomorrow.
 
 **Do not fix anything today.** You are here to recognise these when they come back
 on day 3.
+
+Both runs were recorded. Have a look:
+
+```
+python -m harness.inject history
+```
+
+Every scorecard from now until the demo lands in that list. It is how you tell a fix
+that worked from a fix that moved the problem somewhere else.
 
 ## 5 · Write the contracts
 
@@ -145,3 +174,7 @@ and the board respects `$PORT`, so it goes up as-is. Then:
 Not one line of your service is written. That is the correct state.
 
 **Tomorrow:** build your piece to what you agreed. See the README.
+
+Three skills ship in `.claude/skills/` and are worth knowing about before you start:
+`failure-to-test`, `board-triage` and `self-healing-review`. Read them — they are
+also the worked example for the skill you will write yourself by day 3.

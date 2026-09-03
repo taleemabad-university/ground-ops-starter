@@ -1,7 +1,7 @@
 """The live board, as a web page. GIVEN.
 
 Open http://localhost:8080/ while ./run is going and watch it move. This is the
-fastest way to see what your build is actually doing — and on day 2, to watch a
+fastest way to see what your build is actually doing — and on day 3, to watch a
 failure land in real time instead of reading it out of a log afterwards.
 
 It is a read-only view. It polls /board and /log and draws them. Nothing here

@@ -1,6 +1,6 @@
 """ASSIGNER — this one is YOURS to fix.
 
-It runs. It places flights. It is also wrong in one specific way, and on day 2
+It runs. It places flights. It is also wrong in one specific way, and on day 3
 that way is going to cost you a flight.
 
     usage:  python -m assigners.naive A 8101

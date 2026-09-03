@@ -7,7 +7,7 @@ Two things live here so you do not have to write them three times:
 
 That second one matters more than it looks. SLO 4 says your piece has to run
 somewhere a teammate can reach — not just on your laptop. Everything you build
-answers on a port from minute one, and on day 2 the harness reads /state and
+answers on a port from minute one, and on day 3 the harness reads /state and
 /log to work out whether your piece survived. A piece nobody can see is a piece
 we score as absent.
 """

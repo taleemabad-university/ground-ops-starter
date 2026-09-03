@@ -98,7 +98,7 @@ class Handler(BaseHTTPRequestHandler):
                 BOARD.release_gate(b["gate"], actor)
             elif self.path == "/flag":
                 BOARD.flag(b["flight"], b["decision"], b.get("reason", ""), actor)
-            # ── harness only · day 2 ──
+            # ── harness only · day 3 ──
             elif self.path == "/admin/delay":
                 return self._send(200, {"ok": True, **BOARD.inject_delay(b["flight"], b["minutes"])})
             elif self.path == "/admin/close-runway":

@@ -8,8 +8,9 @@ board up, point your piece at it, and assert on what it did.
 
 SLO 5 — write a test for your piece and use it to catch a problem BEFORE
         everything is joined up.
-SLO 7 — every failure you hit on day 2 becomes a test here, so it cannot
-        come back the same way.
+SLO 7 — every failure you hit on day 3 becomes a test here, so it cannot
+        come back the same way. The `failure-to-test` skill walks that loop —
+        see .claude/skills/.
 """
 import unittest
 

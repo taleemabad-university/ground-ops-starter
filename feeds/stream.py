@@ -4,7 +4,7 @@ Arrivals and departures come in on their own schedule. They overlap: the same
 flight shows up on both feeds, and sometimes twice on one. That is real, and
 de-duplicating it is the board's job (board.upsert returns False for a repeat).
 
-The feed is also where two of the day-2 failures come from, so read from it and
+The feed is also where two of the day-3 failures come from, so read from it and
 never assume a flight you have seen once will not turn up again.
 """
 import itertools

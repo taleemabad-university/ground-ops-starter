@@ -145,6 +145,61 @@ trick works for your own piece.
 
 ---
 
+## What the repo does for you — skills and the healing patterns
+
+### The four healing patterns
+
+A self-healing system is not one that never gets hit. It is one that takes the hit,
+says so, and keeps going. There are exactly four patterns you have to get right, and
+each one maps to a failure we inject on day 3:
+
+| Pattern | Whose | Fails without it |
+|---|---|---|
+| Retry on refusal | assigners | the race |
+| Damping | re-planner | the runaway |
+| Blast radius | re-planner | the runaway, and it worsens the race |
+| Timeout → fallback | monitor | the dead end |
+
+**[SELF-HEALING.md](SELF-HEALING.md) is the four questions**, plus the three things
+the repo already heals for you — so you can tell what you are standing on from what
+you still have to build. Read it on day 1.
+
+### Three skills ship with the repo
+
+In [.claude/skills/](.claude/skills/). Clone the repo and Claude Code can use them:
+
+| Skill | What it does |
+|---|---|
+| `failure-to-test` | Turn an injected failure into a regression test that fails before the fix and passes after |
+| `board-triage` | Work out whose piece broke, from the board's evidence — never from a teammate's source |
+| `self-healing-review` | Audit your piece against the four patterns before day 3 does it for you |
+
+**SLO 7 is still yours.** You are not scored on having invented the first example —
+you are scored on **recognising a procedure you keep repeating and writing it down**.
+So: use these, and then write the one they don't cover. Every team hits something
+specific to how they built it; that is your skill, and it goes in
+`.claude/skills/` alongside these.
+
+### Are you actually getting better?
+
+Every scorecard is recorded. Nothing to set up:
+
+```bash
+./inject verdict     # score the board now — and see what moved since last time
+./inject history     # every run so far
+```
+
+```
+2026-09-03 09:14:02  2/4  .+.+    04 · the runaway
+2026-09-03 11:40:55  4/4  ++++    04 · the runaway
+```
+
+After a fix, the scenario's score should move. **If it didn't, you fixed something
+else** — that is the honest check, and it is the whole reason the loop is written
+down instead of remembered.
+
+---
+
 ## What `contracts.md` is, and who fills it in
 
 > A contract is the promise your service makes to the one next to it: exactly what
@@ -186,7 +241,9 @@ minute per six real seconds, so a timeout in wall-clock seconds never fires).
 |---|---|---|
 | `board/` | **given** | The shared state, both hard rules under one lock, and `db.py` — SQLite persistence plus the full decision history. Plus `client.py`, the client and "be reachable" helper. |
 | `feeds/` | **given** | Arrivals and departures, live, with duplicates in them. |
-| `harness/` | **given** | The failure injector and the verdict checks we run on day 3. Run them yourself as often as you like. |
+| `harness/` | **given** | The failure injector and the verdict checks we run on day 3. Run them yourself as often as you like — every run is recorded, so you can see the number move. |
+| `SELF-HEALING.md` | **given** | The four healing patterns, as questions. Read on day 1. |
+| `.claude/skills/` | **half each** | Three skills ship. The one for whatever *you* keep repeating is yours to add. |
 | `assigners/` | **yours** | Two or more, running at once. They compete. |
 | `replanner/` | **yours** | Redo the flights a delay actually touched — and damp it. |
 | `monitor/` | **yours** | Timer, safe fallback, logs, and the tests. |
@@ -216,11 +273,18 @@ it. On Monday it isn't, and an agent working in this repo has no way to know any
 of it. Writing those down *is* Part A SLO 3 — hidden dependencies — done for
 real rather than described.
 
-**Skills** are yours entirely. A skill is a procedure you would otherwise repeat
-by hand. Don't invent one on day 1; you'll know when you need it. The obvious
-candidate turns up on day 3, the second time you turn a failure into a
-regression test — write the steps down once instead of re-deriving them. That's
-SLO 7 as something you can hand to someone else.
+**Skills — three ship, the next one is yours.** A skill is a procedure you would
+otherwise repeat by hand, written down so nobody re-derives it. The repo ships
+`failure-to-test`, `board-triage` and `self-healing-review` in
+[.claude/skills/](.claude/skills/) — use them from day 1, and read them, because they
+are also the worked example of what a skill looks like.
+
+**SLO 7 is not "did you invent one from nothing".** It is *did you notice a procedure
+you keep repeating, and write it down so it can be handed over*. So the outcome is:
+use the three, then add the one they don't cover. Every team hits something specific
+to how they built it — a deploy dance, a way of reading their own logs, the sequence
+for bringing a piece back after it drops out. **That** is your skill, and by day 3 you
+will know exactly what it is.
 
 ### Where the data lives
 

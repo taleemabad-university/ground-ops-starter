@@ -28,6 +28,7 @@ decision you quietly make for me costs me the thing I came for.
 1. README.md          what this is, the two hard rules, how it gets broken, the scoring
 2. CLAUDE.md          the board contract, the do-not-edit list, the conventions
 3. contracts.md       my team filled this in on day 1. It is binding. Build to it.
+3b. SELF-HEALING.md   the four healing patterns. The one for my role is the build.
 4. The header comment of the file for my role. It says exactly what is wrong with
    the version that ships. That is my starting point, not my answer.
 
@@ -57,6 +58,14 @@ either side of me expects, and the single most likely way my role gets it wrong.
 - Nothing I write may assume macOS or bash. Five people on five different laptops run
   this repo, and some are on Windows.
 
+## Skills available — use them, don't re-derive them
+Three ship in .claude/skills/. Reach for them by name:
+  self-healing-review   audit my piece against the four patterns (do this in PHASE 1)
+  failure-to-test       turn an injected failure into a regression test (PHASE 4)
+  board-triage          work out whose piece broke, from the board's evidence
+By PHASE 5 I have to write the skill these three DON'T cover — whatever my team kept
+re-deriving. Watch for it as we go and tell me when you spot one.
+
 ## PHASE 1 — build my piece to the contract we agreed
 Start from what the header comment says is wrong with the shipped version. Smallest
 thing that satisfies contracts.md first. Show me the plan before you write code, and
@@ -84,7 +93,10 @@ For each failure: work out whether it's my piece or upstream, using the board lo
   curl "localhost:8080/decisions?flight=PK-304"
 before touching any code. If it's upstream, tell me plainly and early so I can tell
 the person who owns it — that is scored too.
-EVERY failure I hit becomes a test in tests/. No exceptions.
+EVERY failure I hit becomes a test in tests/. No exceptions — use the
+`failure-to-test` skill, and make the test fail BEFORE the fix or it proves nothing.
+After each fix run `python -m harness.inject history` — if the scenario's score did
+not move, I fixed something else. Tell me that plainly rather than calling it done.
 STOP after each injection and tell me what broke and why.
 
 ## PHASE 5 — write down what only I know
@@ -92,8 +104,10 @@ Fill in the YOURS half of CLAUDE.md with me: what my service does and deliberate
 does not do, my contract with the pieces either side, the decisions I don't want
 quietly undone (with the REASONING, not just the rule), and the section that counts
 most — things that are true but not obvious from reading the code.
-Then write up, as a skill, the procedure I have now repeated: turning a failure into
-a regression test.
+Then the skill. `failure-to-test`, `board-triage` and `self-healing-review` already
+ship — so mine is the one they DON'T cover: whatever my team kept re-deriving by hand.
+Help me spot it from what we actually did over the three days, write it into
+.claude/skills/, and name it in CLAUDE.md. That is SLO 7.
 
 ## PHASE 6 — demo ready
 A failure gets injected DURING the demo. Help me rehearse: what I say while it lands,
@@ -116,7 +130,13 @@ the board and keeping the team honest:
   - contracts.md and its change log
   - the answer to "is the board healthy", for every piece
 
-Read README.md, CLAUDE.md and contracts.md first.
+Read README.md, CLAUDE.md, contracts.md and SELF-HEALING.md first.
+
+## Skills available
+  board-triage          MY core loop — symptom to owner, from the board's evidence
+  self-healing-review   audit a piece against the four patterns
+  failure-to-test       turn a failure into a regression test
+Use board-triage by name every time something looks wrong. Do not re-derive it.
 
 ## Hard rules
 - I do NOT edit board/, feeds/ or harness/ — nobody does, me least of all. They are
@@ -143,6 +163,7 @@ Set me up to watch the board's health and route what I find. Teach me to read:
   python -m harness.inject verdict           the five checks, right now
   curl -s localhost:8080/log                 what the board saw
   curl -s "localhost:8080/decisions?flight=PK-304"    one flight's whole life
+  python -m harness.inject history           every run so far — are we improving?
 Then help me turn each finding into a message to the right owner:
   "the board isn't settling"                  -> the re-planner (damping)
   "assigner B's state has split from the board" -> assigner B (it ignored a 409)
